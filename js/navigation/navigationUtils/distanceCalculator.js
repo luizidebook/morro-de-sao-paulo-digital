@@ -76,34 +76,6 @@ export function isValidCoordinate(lat, lon) {
 }
 
 /**
- * Calcula o ângulo (bearing) entre dois pontos
- * @param {number} lat1 - Latitude do ponto 1
- * @param {number} lon1 - Longitude do ponto 1
- * @param {number} lat2 - Latitude do ponto 2
- * @param {number} lon2 - Longitude do ponto 2
- * @returns {number} Ângulo em graus (0-360)
- */
-export function calculateBearing(lat1, lon1, lat2, lon2) {
-  // Converter graus para radianos
-  const toRad = (value) => (value * Math.PI) / 180;
-
-  const startLat = toRad(lat1);
-  const startLon = toRad(lon1);
-  const destLat = toRad(lat2);
-  const destLon = toRad(lon2);
-
-  const y = Math.sin(destLon - startLon) * Math.cos(destLat);
-  const x =
-    Math.cos(startLat) * Math.sin(destLat) -
-    Math.sin(startLat) * Math.cos(destLat) * Math.cos(destLon - startLon);
-
-  let bearing = Math.atan2(y, x);
-  bearing = ((bearing * 180) / Math.PI + 360) % 360; // Converter para graus
-
-  return bearing;
-}
-
-/**
  * Calcula se um ponto está próximo de um segmento de rota
  * @param {Object} point - Ponto atual {lat, lon}
  * @param {Object} routeSegment - Segmento da rota [{lat, lon}, {lat, lon}]
@@ -345,7 +317,7 @@ export function findClosestPointOnRoute(routePoints, refLat, refLon) {
 
 export default {
   calculateDistance,
-  calculateBearing,
+
   bearingToCardinal,
   findClosestPointOnRoute,
 };

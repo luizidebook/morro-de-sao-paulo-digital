@@ -1114,64 +1114,54 @@ export function isRotatedMarkerPluginAvailable() {
 }
 
 /**
- * Atualiza o marcador do usuário no mapa
- * @param {number} lat - Latitude
- * @param {number} lon - Longitude
- * @param {number} heading - Direção em graus (0-359)
- * @param {number} accuracy - Precisão em metros
- * @returns {boolean} Sucesso da operação
+ * Updates the user marker position and rotation
+ * @param {number} lat - User's latitude
+ * @param {number} lon - User's longitude
+ * @param {number} heading - Direction in degrees (0-359)
+ * @param {number} accuracy - Position accuracy in meters
+ * @returns {boolean} - Success status
  */
 export function updateUserMarker(lat, lon, heading = 0, accuracy = 15) {
-  // Validação robusta dos parâmetros
   if (lat === undefined || lon === undefined || isNaN(lat) || isNaN(lon)) {
-    console.error("[updateUserMarker] Coordenadas inválidas:", lat, lon);
+    console.error("[updateUserMarker] Invalid coordinates:", lat, lon);
     return false;
   }
 
   try {
-    const mapInstance = map;
-    if (!mapInstance) {
-      console.warn("[updateUserMarker] Instância de mapa não disponível");
-      return false;
-    }
-
-    // Criar marcador se não existir
+    // Create marker if it doesn't exist
     if (!window.userMarker) {
       return createUserMarker(lat, lon, heading, accuracy);
     }
 
-    // Atualizar posição
+    // Update marker position
     window.userMarker.setLatLng([lat, lon]);
 
-    // Aplicar rotação
+    // Apply rotation if heading is valid
     if (typeof heading === "number" && !isNaN(heading)) {
-      // Via plugin se disponível
+      // Important: Do NOT add 180 degrees here, as it's done in updateUserMarkerDirection
       if (typeof window.userMarker.setRotationAngle === "function") {
         window.userMarker.setRotationAngle(heading);
-        console.log(`[updateUserMarker] Aplicando rotação: ${heading}°`);
-      }
-      // Fallback via CSS
-      else {
+        console.log(
+          `[updateUserMarker] Applying rotation: ${heading.toFixed(1)}°`
+        );
+      } else {
+        // Fallback for when the rotation plugin isn't available
         try {
-          const markerElement =
-            window.userMarker._icon ||
-            (window.userMarker.getElement
-              ? window.userMarker.getElement()
-              : null);
-
+          const markerElement = window.userMarker._icon;
           if (markerElement) {
+            markerElement.style.transformOrigin = "center center";
             markerElement.style.transform = `rotate(${heading}deg)`;
           }
         } catch (error) {
           console.error(
-            "[updateUserMarker] Erro ao aplicar rotação via CSS:",
+            "[updateUserMarker] Error applying CSS rotation:",
             error
           );
         }
       }
     }
 
-    // Atualizar círculo de precisão
+    // Update accuracy circle
     if (window.userAccuracyCircle) {
       window.userAccuracyCircle.setLatLng([lat, lon]);
       window.userAccuracyCircle.setRadius(accuracy);
@@ -1179,11 +1169,10 @@ export function updateUserMarker(lat, lon, heading = 0, accuracy = 15) {
 
     return true;
   } catch (error) {
-    console.error("[updateUserMarker] Erro:", error);
+    console.error("[updateUserMarker] Error:", error);
     return false;
   }
 }
-
 /**
  * Cria um marcador para a localização do usuário em formato de seta vermelha
  * com rotação baseada na direção de movimento e um popup informativo
@@ -2131,150 +2120,232 @@ export function getEnhancedPosition(options = {}) {
 }
 
 /**
- * Atualiza o marcador do usuário para apontar para o próximo ponto da rota
- * Versão robusta que garante que o marcador sempre aponte na direção correta
- * @param {Object} userPos - Posição do usuário: {latitude, longitude}
- * @param {Array} routePoints - Pontos da rota
- * @param {boolean} debug - Flag para ativar logs de depuração
+ * Atualiza a direção do marcador do usuário para apontar para o próximo ponto da rota
+ * @param {Object} userPos - Posição atual do usuário {latitude, longitude}
+ * @param {Array} routePoints - Array de pontos da rota
+ * @param {boolean} [debug=false] - Modo de depuração para logs detalhados
+ * @returns {number|null} - Ângulo calculado ou null se falhar
  */
 export function updateUserMarkerDirection(userPos, routePoints, debug = false) {
-  // Verificações de validade robustas
-  if (!userPos || !userPos.latitude || !userPos.longitude) {
-    console.warn("[updateUserMarkerDirection] Posição do usuário inválida");
-    return;
-  }
-
-  if (!routePoints || !Array.isArray(routePoints) || routePoints.length < 2) {
-    console.warn("[updateUserMarkerDirection] Pontos de rota inválidos");
-    return;
-  }
-
   try {
-    // Encontrar o ponto mais próximo na rota
-    let nearestPointIndex = 0;
+    // Validar os dados de entrada
+    if (!userPos || !userPos.latitude || !userPos.longitude) {
+      console.warn("[updateUserMarkerDirection] Posição do usuário inválida");
+      return null;
+    }
+
+    if (!routePoints || !Array.isArray(routePoints) || routePoints.length < 2) {
+      console.warn("[updateUserMarkerDirection] Pontos da rota inválidos");
+      return null;
+    }
+
+    // 1. Encontrar o ponto mais próximo na rota
     let minDistance = Infinity;
+    let nearestPointIndex = 0;
 
     for (let i = 0; i < routePoints.length; i++) {
       const point = routePoints[i];
-      // Garantir que o ponto está no formato correto [lat, lon]
-      const lat = Array.isArray(point) ? point[0] : point.lat;
-      const lon = Array.isArray(point) ? point[1] : point.lng || point.lon;
 
-      if (lat !== undefined && lon !== undefined) {
-        const distance = calculateDistance(
-          userPos.latitude,
-          userPos.longitude,
-          lat,
-          lon
-        );
+      // Normalizar coordenadas do ponto (diferentes formatos possíveis)
+      const pointLat =
+        typeof point === "object"
+          ? point.lat ||
+            point.latitude ||
+            (Array.isArray(point) ? point[0] : null)
+          : Array.isArray(routePoints[i])
+          ? routePoints[i][0]
+          : null;
 
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestPointIndex = i;
-        }
-      }
-    }
+      const pointLon =
+        typeof point === "object"
+          ? point.lng ||
+            point.lon ||
+            point.longitude ||
+            (Array.isArray(point) ? point[1] : null)
+          : Array.isArray(routePoints[i])
+          ? routePoints[i][1]
+          : null;
 
-    // Encontrar o próximo ponto na rota (pelo menos 10m à frente)
-    let nextPointIndex = nearestPointIndex;
-    let nextPoint = null;
+      if (pointLat === null || pointLon === null) continue;
 
-    // Procurar um ponto à frente que seja significativo (>10m de distância)
-    for (
-      let i = nearestPointIndex + 1;
-      i < routePoints.length && i < nearestPointIndex + 20;
-      i++
-    ) {
-      const point = routePoints[i];
-      const lat = Array.isArray(point) ? point[0] : point.lat;
-      const lon = Array.isArray(point) ? point[1] : point.lng || point.lon;
-
-      if (lat !== undefined && lon !== undefined) {
-        const distanceToPoint = calculateDistance(
-          userPos.latitude,
-          userPos.longitude,
-          lat,
-          lon
-        );
-
-        // Se o ponto está a mais de 10m de distância, usar como ponto de destino
-        if (distanceToPoint > 10) {
-          nextPointIndex = i;
-          nextPoint = { lat, lon };
-          break;
-        }
-      }
-    }
-
-    // Se não encontrou um ponto adequado, usar o próximo da sequência
-    if (!nextPoint && nextPointIndex + 1 < routePoints.length) {
-      const point = routePoints[nextPointIndex + 1];
-      const lat = Array.isArray(point) ? point[0] : point.lat;
-      const lon = Array.isArray(point) ? point[1] : point.lng || point.lon;
-
-      if (lat !== undefined && lon !== undefined) {
-        nextPoint = { lat, lon };
-      }
-    }
-
-    // Se temos um próximo ponto, calcular o ângulo e atualizar o marcador
-    if (nextPoint) {
-      const bearing = calculateBearing(
+      const distance = calculateDistance(
         userPos.latitude,
         userPos.longitude,
-        nextPoint.lat,
-        nextPoint.lon
+        pointLat,
+        pointLon
       );
 
-      console.log(
-        `[updateUserMarkerDirection] Marcador apontando para o próximo ponto da rota: ${bearing.toFixed(
-          1
-        )}°`,
-        {
-          de: [userPos.latitude, userPos.longitude],
-          para: [nextPoint.lat, nextPoint.lon],
-        }
-      );
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestPointIndex = i;
+      }
+    }
 
-      // Atualizar o marcador do usuário com o ângulo calculado
-      updateUserMarker(
+    // 2. Encontrar um ponto adiante na rota para orientar (não muito próximo nem muito distante)
+    let targetPointIndex = nearestPointIndex;
+    const MIN_DISTANCE = 10; // metros
+    const MAX_POINTS_AHEAD = 20;
+
+    for (let i = 1; i <= MAX_POINTS_AHEAD; i++) {
+      const lookAheadIndex = nearestPointIndex + i;
+      if (lookAheadIndex >= routePoints.length) break;
+
+      const point = routePoints[lookAheadIndex];
+
+      // Normalizar coordenadas do ponto
+      const pointLat =
+        typeof point === "object"
+          ? point.lat ||
+            point.latitude ||
+            (Array.isArray(point) ? point[0] : null)
+          : Array.isArray(routePoints[lookAheadIndex])
+          ? routePoints[lookAheadIndex][0]
+          : null;
+
+      const pointLon =
+        typeof point === "object"
+          ? point.lng ||
+            point.lon ||
+            point.longitude ||
+            (Array.isArray(point) ? point[1] : null)
+          : Array.isArray(routePoints[lookAheadIndex])
+          ? routePoints[lookAheadIndex][1]
+          : null;
+
+      if (pointLat === null || pointLon === null) continue;
+
+      const distance = calculateDistance(
         userPos.latitude,
         userPos.longitude,
-        bearing, // Usar o ângulo calculado, não o heading do dispositivo
-        userPos.accuracy || 15
+        pointLat,
+        pointLon
       );
 
-      // 5. Aplicar a rotação ao marcador do usuário
-      if (window.userMarker) {
-        // MODIFICAÇÃO: Ajustar o ângulo para compensar a orientação do SVG
-        const correctedBearing = (bearing + 180) % 360;
-
-        if (typeof window.userMarker.setRotationAngle === "function") {
-          // Usando o plugin Leaflet.RotatedMarker
-          window.userMarker.setRotationAngle(correctedBearing);
-
-          // ADICIONADO: Armazenar em uma variável global para referência
-          window.lastRotationAngle = correctedBearing;
-
-          if (debug) {
-            console.log(
-              `[updateUserMarkerDirection] Rotação aplicada ao marcador: ${correctedBearing.toFixed(
-                2
-              )}° (original: ${bearing.toFixed(2)}°)`
-            );
-          }
-        }
+      // Se encontramos um ponto suficientemente distante, usá-lo
+      if (distance > MIN_DISTANCE) {
+        targetPointIndex = lookAheadIndex;
+        break;
       }
 
-      // MODIFICAÇÃO: Retornar o ângulo corrigido, não o original
-      return correctedBearing;
-    } else {
+      // Caso não encontre ponto suficientemente distante, usar o último válido
+      targetPointIndex = lookAheadIndex;
+    }
+
+    // 3. Obter coordenadas do ponto alvo
+    const targetPoint = routePoints[targetPointIndex];
+
+    if (!targetPoint) {
+      console.warn("[updateUserMarkerDirection] Ponto alvo não encontrado");
+      return null;
+    }
+
+    // Normalizar coordenadas do ponto alvo
+    const targetLat =
+      typeof targetPoint === "object"
+        ? targetPoint.lat ||
+          targetPoint.latitude ||
+          (Array.isArray(targetPoint) ? targetPoint[0] : null)
+        : Array.isArray(routePoints[targetPointIndex])
+        ? routePoints[targetPointIndex][0]
+        : null;
+
+    const targetLon =
+      typeof targetPoint === "object"
+        ? targetPoint.lng ||
+          targetPoint.lon ||
+          targetPoint.longitude ||
+          (Array.isArray(targetPoint) ? targetPoint[1] : null)
+        : Array.isArray(routePoints[targetPointIndex])
+        ? routePoints[targetPointIndex][1]
+        : null;
+
+    if (targetLat === null || targetLon === null) {
       console.warn(
-        "[updateUserMarkerDirection] Não foi possível encontrar próximo ponto válido na rota"
+        "[updateUserMarkerDirection] Coordenadas do ponto alvo inválidas"
+      );
+      return null;
+    }
+
+    // 4. Calcular o bearing (ângulo/direção) entre o usuário e o ponto alvo
+    const bearing = calculateBearing(
+      userPos.latitude,
+      userPos.longitude,
+      targetLat,
+      targetLon
+    );
+
+    // Correção do ângulo para compensar a orientação do SVG - AQUI ESTÁ A CORREÇÃO
+    const correctedBearing = (bearing + 180) % 360;
+
+    if (debug) {
+      console.log(
+        `[updateUserMarkerDirection] Direção calculada: ${bearing.toFixed(
+          2
+        )}° ` +
+          `(índice próximo: ${nearestPointIndex}, alvo: ${targetPointIndex}, ` +
+          `distância: ${minDistance.toFixed(1)}m)`
       );
     }
+
+    // 5. Aplicar a rotação ao marcador do usuário
+    if (window.userMarker) {
+      if (typeof window.userMarker.setRotationAngle === "function") {
+        // Usando o plugin Leaflet.RotatedMarker
+        window.userMarker.setRotationAngle(correctedBearing);
+
+        if (debug) {
+          console.log(
+            `[updateUserMarkerDirection] Rotação aplicada ao marcador: ${correctedBearing.toFixed(
+              2
+            )}° (original: ${bearing.toFixed(2)}°)`
+          );
+        }
+      } else {
+        // Fallback: aplicar rotação via CSS
+        try {
+          const markerElement =
+            window.userMarker._icon ||
+            (window.userMarker.getElement
+              ? window.userMarker.getElement()
+              : null);
+
+          if (markerElement) {
+            markerElement.style.transform = `rotate(${correctedBearing}deg)`;
+            if (debug) {
+              console.log(
+                `[updateUserMarkerDirection] Rotação aplicada via CSS: ${correctedBearing.toFixed(
+                  2
+                )}°`
+              );
+            }
+          }
+        } catch (error) {
+          console.error(
+            "[updateUserMarkerDirection] Erro ao aplicar rotação via CSS:",
+            error
+          );
+        }
+      }
+    }
+
+    // CORREÇÃO: Adicionar de um objeto de debug para ajudar no diagnóstico
+    if (debug) {
+      window.lastDirectionDebug = {
+        from: [userPos.latitude, userPos.longitude],
+        to: [targetLat, targetLon],
+        bearing: bearing,
+        correctedBearing: correctedBearing,
+        targetPointIndex: targetPointIndex,
+        nearestPointIndex: nearestPointIndex,
+        minDistance: minDistance,
+      };
+    }
+
+    // Retornar o ângulo corrigido
+    return correctedBearing;
   } catch (error) {
     console.error("[updateUserMarkerDirection] Erro:", error);
+    return null;
   }
 }
 

@@ -10,7 +10,7 @@ export function showNotification(message, type = "info", options = {}) {
     duration: options.duration || getDefaultDuration(type),
     showClose: options.showClose !== false,
     speakMessage: options.speakMessage || false,
-    position: options.position || "bottom-center",
+    position: options.position || "top-center",
   };
 
   // Criar elemento de notificação

@@ -15,6 +15,8 @@ import {
   getLastRouteData as getLastSavedRouteData,
   setLastRouteData,
 } from "../navigationState/navigationStateManager.js";
+import { isValidCoordinate } from "../navigationUtils/distanceCalculator.js";
+
 import { processRouteInstructions } from "../navigationInstructions/routeProcessor.js";
 
 // UI components
@@ -40,7 +42,6 @@ import { speak } from "../../utils/voice/voiceSystem.js";
 import { showNavigationLoading } from "../navigationUi/bannerUI.js";
 // Location services
 import {
-  animateMapToLocalizationUser,
   positionWatcherId,
   startPositionTracking,
   updateUserMarker,
@@ -476,6 +477,7 @@ export async function startNavigation(destination) {
           lon: userLocation.longitude,
         }
       );
+
       updateRealTimeNavigation(userLocation);
     } else {
       console.warn(
@@ -1222,261 +1224,338 @@ export function checkDestinationArrival(userLat, userLon) {
  * @param {Object} [userPos=null] - Posição atual do usuário (opcional)
  */
 export function updateRealTimeNavigation(userPos = null) {
-  // Usar o parâmetro se fornecido, caso contrário usar a variável global
-  const currentPos = userPos || userLocation;
+  try {
+    // Validate the navigation state
+    if (!navigationState.isActive || !navigationState.instructions) {
+      return false;
+    }
 
-  // Validação mais rigorosa
-  if (!currentPos) {
-    console.warn("[updateRealTimeNavigation] Posição indefinida");
-    return;
-  }
+    // Get current user position
+    const currentPos = userPos || userLocation;
+    if (
+      !currentPos ||
+      !isValidCoordinate(currentPos.latitude, currentPos.longitude)
+    ) {
+      console.warn("[updateRealTimeNavigation] Invalid user position");
+      return false;
+    }
+    // Find next step coordinates
+    const nextStep = navigationState.instructions[currentStep];
+    const nextStepLat = nextStep.latitude || nextStep.lat;
+    const nextStepLon = nextStep.longitude || nextStep.lon || nextStep.lng;
 
-  if (typeof currentPos !== "object") {
-    console.error(
-      "[updateRealTimeNavigation] Tipo inválido de posição:",
-      typeof currentPos
+    // Calculate bearing to next step
+    const bearing = calculateBearing(
+      parseFloat(currentPos.latitude),
+      parseFloat(currentPos.longitude),
+      parseFloat(nextStepLat),
+      parseFloat(nextStepLon)
     );
-    return;
-  }
+    // The SVG is pointing up (north), so we need to add 180 to make it point
+    // in the direction of travel. This is the ONLY place we should adjust the angle.
+    const correctedBearing = (bearing + 180) % 360;
 
-  if (
-    !currentPos.latitude ||
-    !currentPos.longitude ||
-    isNaN(currentPos.latitude) ||
-    isNaN(currentPos.longitude) ||
-    Math.abs(currentPos.latitude) > 90 ||
-    Math.abs(currentPos.longitude) > 180
-  ) {
-    console.warn(
-      "[updateRealTimeNavigation] Posição com coordenadas inválidas:",
-      currentPos
-    );
-    return;
-  }
-
-  console.log("[updateRealTimeNavigation] Atualizando com posição:", {
-    lat: currentPos.latitude,
-    lon: currentPos.longitude,
-    accuracy: currentPos.accuracy || "N/A",
-  });
-
-  const instructions = navigationState.instructions;
-  if (!instructions || instructions.length === 0) return;
-
-  // Se não houver mudança significativa na posição, ignorar atualização
-  if (navigationState.lastProcessedPosition) {
-    const MOVEMENT_THRESHOLD = 3; // Metros (reduzido para maior sensibilidade)
-    const distanceMoved = calculateDistance(
+    // 1. Update user marker with correct orientation
+    updateUserMarker(
       currentPos.latitude,
       currentPos.longitude,
-      navigationState.lastProcessedPosition.latitude,
-      navigationState.lastProcessedPosition.longitude
+      correctedBearing, // Use corrected bearing
+      currentPos.accuracy || 15
     );
 
-    // Verificar quando foi a última atualização
-    const now = Date.now();
-    const lastUpdateTime = navigationState.lastUpdateTime || 0;
-    const timeSinceLastUpdate = now - lastUpdateTime;
-    const FORCE_UPDATE_INTERVAL = 10000; // 10 segundos
+    console.log(
+      `[updateRealTimeNavigation] User marker oriented toward next step: ${correctedBearing.toFixed(
+        1
+      )}° (original: ${bearing.toFixed(1)}°)`
+    );
 
-    // Forçar atualização se passou tempo suficiente, mesmo sem movimento
-    if (
-      distanceMoved < MOVEMENT_THRESHOLD &&
-      timeSinceLastUpdate < FORCE_UPDATE_INTERVAL
-    ) {
-      console.log(
-        "[updateRealTimeNavigation] Movimento insignificante, ignorando atualização"
+    // 2. Rotate map if rotation is enabled
+    if (navigationState.isRotationEnabled) {
+      rotateMap(bearing); // Use original bearing for map rotation
+    }
+
+    // 3. Center map on user with appropriate offset
+    centerMapOnUser(
+      currentPos.latitude,
+      currentPos.longitude,
+      bearing, // Original bearing for calculating offset
+      null // Use current zoom
+    );
+
+    if (typeof currentPos !== "object") {
+      console.error(
+        "[updateRealTimeNavigation] Tipo inválido de posição:",
+        typeof currentPos
       );
-      return; // Ignorar atualizações muito próximas
+      return;
     }
 
-    // Atualizar timestamp da última atualização
-    navigationState.lastUpdateTime = now;
-  }
-
-  // Determinar qual passo atual deve ser exibido
-  const currentStepIndex = navigationState.currentStepIndex;
-  let shouldUpdateStep = false;
-  let nextStepIndex = currentStepIndex;
-
-  // Verificar se já passou do passo atual
-  if (currentStepIndex < instructions.length - 1) {
-    const currentStep = instructions[currentStepIndex];
-    const nextStep = instructions[currentStepIndex + 1];
-
-    if (currentStep && nextStep) {
-      // Extrair coordenadas do próximo passo com mais robustez
-      const nextStepLat =
-        nextStep.latitude ||
-        nextStep.lat ||
-        (nextStep.location && nextStep.location[0]) ||
-        (nextStep.coordinates && nextStep.coordinates[0]);
-
-      const nextStepLon =
-        nextStep.longitude ||
-        nextStep.lon ||
-        nextStep.lng ||
-        (nextStep.location && nextStep.location[1]) ||
-        (nextStep.coordinates && nextStep.coordinates[1]);
-
-      // Imprimir valores para diagnóstico
-      console.log("[updateRealTimeNavigation] Extraindo coordenadas:", {
-        nextStep: {
-          original: nextStep,
-          lat: nextStepLat,
-          lon: nextStepLon,
-        },
-        currentPos: {
-          lat: currentPos.latitude,
-          lon: currentPos.longitude,
-        },
-      });
-
-      // Verificar validade explicitamente
-      if (
-        nextStepLat !== undefined &&
-        nextStepLat !== null &&
-        !isNaN(parseFloat(nextStepLat)) &&
-        nextStepLon !== undefined &&
-        nextStepLon !== null &&
-        !isNaN(parseFloat(nextStepLon)) &&
-        currentPos.latitude !== undefined &&
-        !isNaN(parseFloat(currentPos.latitude)) &&
-        currentPos.longitude !== undefined &&
-        !isNaN(parseFloat(currentPos.longitude))
-      ) {
-        // ADICIONAR: Calcular o ângulo para o próximo passo
-        const bearing = calculateBearing(
-          parseFloat(currentPos.latitude),
-          parseFloat(currentPos.longitude),
-          parseFloat(nextStepLat),
-          parseFloat(nextStepLon)
-        );
-
-        // MODIFICAÇÃO: Passar o ângulo já corrigido para evitar dupla correção
-        const correctedBearing = (bearing + 180) % 360;
-
-        // ADICIONAR: Atualizar o marcador com a orientação para o próximo passo
-        updateUserMarker(
-          currentPos.latitude,
-          currentPos.longitude,
-          correctedBearing, // Usar o ângulo já corrigido
-          currentPos.accuracy || 15
-        );
-
-        console.log(
-          `[updateRealTimeNavigation] Marcador orientado para próximo passo: ${bearing.toFixed(
-            1
-          )}°`
-        );
-
-        // Resto do código existente (cálculo de distância, etc.)
-        // Converter explicitamente para números para garantir operações matemáticas corretas
-        const lat1 = parseFloat(currentPos.latitude);
-        const lon1 = parseFloat(currentPos.longitude);
-        const lat2 = parseFloat(nextStepLat);
-        const lon2 = parseFloat(nextStepLon);
-
-        const distanceToNextStep = calculateDistance(lat1, lon1, lat2, lon2);
-
-        console.log(
-          `[updateRealTimeNavigation] Distância até próximo passo: ${distanceToNextStep.toFixed(
-            1
-          )}m`
-        );
-
-        // Monitorar aproximação de curvas
-        monitorApproachingTurn(currentPos, nextStep, distanceToNextStep);
-
-        // Se estiver próximo ao próximo passo (menos de 20 metros), avançar
-        if (distanceToNextStep <= 20) {
-          nextStepIndex = currentStepIndex + 1;
-          shouldUpdateStep = true;
-          console.log(
-            "[updateRealTimeNavigation] Próximo do passo seguinte, avançando instruções"
-          );
-        }
-      } else {
-        console.warn(
-          "[updateRealTimeNavigation] Dados de coordenadas inválidos:",
-          {
-            nextStep: nextStep,
-            currentPos: {
-              latitude: currentPos.latitude,
-              longitude: currentPos.longitude,
-            },
-          }
-        );
-      }
+    if (
+      !currentPos.latitude ||
+      !currentPos.longitude ||
+      isNaN(currentPos.latitude) ||
+      isNaN(currentPos.longitude) ||
+      Math.abs(currentPos.latitude) > 90 ||
+      Math.abs(currentPos.longitude) > 180
+    ) {
+      console.warn(
+        "[updateRealTimeNavigation] Posição com coordenadas inválidas:",
+        currentPos
+      );
+      return;
     }
-  }
-  // Se chegou ao último passo, verificar proximidade com o destino final
-  if (nextStepIndex === instructions.length - 1) {
-    const destination = navigationState.selectedDestination;
-    if (destination) {
-      checkDestinationArrival(currentPos.latitude, currentPos.longitude);
-    }
-  }
 
-  // Atualizar o passo se necessário
-  if (shouldUpdateStep || navigationState.currentStepIndex !== nextStepIndex) {
-    navigationState.currentStepIndex = nextStepIndex;
-    displayNavigationStep(instructions[nextStepIndex]);
-  }
-
-  // Atualizar sempre a posição do marcador do usuário
-  updateUserMarker(
-    currentPos.latitude,
-    currentPos.longitude,
-    currentPos.heading
-  );
-
-  // CORREÇÃO: Calcular distância restante e tempo explicitamente
-  const remainingDistance = calculateRouteRemainingDistance(
-    currentPos,
-    instructions,
-    navigationState.currentStepIndex
-  );
-  const remainingTime = estimateRemainingTime(remainingDistance);
-
-  // Atualizações mais frequentes do banner
-  if (instructions[navigationState.currentStepIndex]) {
-    let currentInstruction = {
-      ...instructions[navigationState.currentStepIndex],
-    };
-
-    // Obter dados da rota completa para calcular progresso
-    const routeData = navigationState.routeData || getLastSavedRouteData();
-    const totalDistance =
-      routeData && routeData.properties
-        ? routeData.properties.summary.distance
-        : 500; // Valor padrão se não houver dados
-
-    // CORREÇÃO: Adicionar métricas atualizadas com tratamento de erro
-    currentInstruction.remainingDistance = formatDistance(remainingDistance);
-    currentInstruction.estimatedTime = formatDuration(remainingTime);
-    currentInstruction.progress = calculateRouteProgress(
-      remainingDistance,
-      totalDistance
-    );
-
-    console.log("[updateRealTimeNavigation] Banner atualizado com métricas:", {
-      distância: currentInstruction.remainingDistance,
-      tempo: currentInstruction.estimatedTime,
-      progresso: currentInstruction.progress + "%",
+    console.log("[updateRealTimeNavigation] Atualizando com posição:", {
+      lat: currentPos.latitude,
+      lon: currentPos.longitude,
+      accuracy: currentPos.accuracy || "N/A",
     });
 
-    // Atualizar o banner com os dados atualizados
-    updateInstructionBanner(currentInstruction);
-  }
+    const instructions = navigationState.instructions;
+    if (!instructions || instructions.length === 0) return;
 
-  // Atualizar a última posição processada
-  navigationState.lastProcessedPosition = {
-    latitude: currentPos.latitude,
-    longitude: currentPos.longitude,
-    accuracy: currentPos.accuracy,
-    heading: currentPos.heading,
-  };
+    // Se não houver mudança significativa na posição, ignorar atualização
+    if (navigationState.lastProcessedPosition) {
+      const MOVEMENT_THRESHOLD = 3; // Metros (reduzido para maior sensibilidade)
+      const distanceMoved = calculateDistance(
+        currentPos.latitude,
+        currentPos.longitude,
+        navigationState.lastProcessedPosition.latitude,
+        navigationState.lastProcessedPosition.longitude
+      );
+
+      // Verificar quando foi a última atualização
+      const now = Date.now();
+      const lastUpdateTime = navigationState.lastUpdateTime || 0;
+      const timeSinceLastUpdate = now - lastUpdateTime;
+      const FORCE_UPDATE_INTERVAL = 10000; // 10 segundos
+
+      // Forçar atualização se passou tempo suficiente, mesmo sem movimento
+      if (
+        distanceMoved < MOVEMENT_THRESHOLD &&
+        timeSinceLastUpdate < FORCE_UPDATE_INTERVAL
+      ) {
+        console.log(
+          "[updateRealTimeNavigation] Movimento insignificante, ignorando atualização"
+        );
+        return; // Ignorar atualizações muito próximas
+      }
+
+      // Atualizar timestamp da última atualização
+      navigationState.lastUpdateTime = now;
+    }
+
+    // Determinar qual passo atual deve ser exibido
+    const currentStepIndex = navigationState.currentStepIndex;
+    let shouldUpdateStep = false;
+    let nextStepIndex = currentStepIndex;
+
+    // Verificar se já passou do passo atual
+    if (currentStepIndex < instructions.length - 1) {
+      const currentStep = instructions[currentStepIndex];
+      const nextStep = instructions[currentStepIndex + 1];
+
+      if (currentStep && nextStep) {
+        // Extrair coordenadas do próximo passo com mais robustez
+        const nextStepLat =
+          nextStep.latitude ||
+          nextStep.lat ||
+          (nextStep.location && nextStep.location[0]) ||
+          (nextStep.coordinates && nextStep.coordinates[0]);
+
+        const nextStepLon =
+          nextStep.longitude ||
+          nextStep.lon ||
+          nextStep.lng ||
+          (nextStep.location && nextStep.location[1]) ||
+          (nextStep.coordinates && nextStep.coordinates[1]);
+
+        // Imprimir valores para diagnóstico
+        console.log("[updateRealTimeNavigation] Extraindo coordenadas:", {
+          nextStep: {
+            original: nextStep,
+            lat: nextStepLat,
+            lon: nextStepLon,
+          },
+          currentPos: {
+            lat: currentPos.latitude,
+            lon: currentPos.longitude,
+          },
+        });
+
+        // Verificar validade explicitamente
+        if (
+          nextStepLat !== undefined &&
+          nextStepLat !== null &&
+          !isNaN(parseFloat(nextStepLat)) &&
+          nextStepLon !== undefined &&
+          nextStepLon !== null &&
+          !isNaN(parseFloat(nextStepLon)) &&
+          currentPos.latitude !== undefined &&
+          !isNaN(parseFloat(currentPos.latitude)) &&
+          currentPos.longitude !== undefined &&
+          !isNaN(parseFloat(currentPos.longitude))
+        ) {
+          // ADICIONAR: Calcular o ângulo para o próximo passo
+          const bearing = calculateBearing(
+            parseFloat(currentPos.latitude),
+            parseFloat(currentPos.longitude),
+            parseFloat(nextStepLat),
+            parseFloat(nextStepLon)
+          );
+
+          // MODIFICAÇÃO: Passar o ângulo já corrigido para evitar dupla correção
+          const correctedBearing = (bearing + 180) % 360;
+
+          // ADICIONAR: Atualizar o marcador com a orientação para o próximo passo
+          updateUserMarker(
+            currentPos.latitude,
+            currentPos.longitude,
+            correctedBearing, // Usar o ângulo já corrigido
+            currentPos.accuracy || 15
+          );
+
+          console.log(
+            `[updateRealTimeNavigation] Marcador orientado para próximo passo: ${bearing.toFixed(
+              1
+            )}°`
+          );
+
+          // Resto do código existente (cálculo de distância, etc.)
+          // Converter explicitamente para números para garantir operações matemáticas corretas
+          const lat1 = parseFloat(currentPos.latitude);
+          const lon1 = parseFloat(currentPos.longitude);
+          const lat2 = parseFloat(nextStepLat);
+          const lon2 = parseFloat(nextStepLon);
+
+          const distanceToNextStep = calculateDistance(lat1, lon1, lat2, lon2);
+
+          console.log(
+            `[updateRealTimeNavigation] Distância até próximo passo: ${distanceToNextStep.toFixed(
+              1
+            )}m`
+          );
+
+          // Monitorar aproximação de curvas
+          monitorApproachingTurn(currentPos, nextStep, distanceToNextStep);
+
+          // Se estiver próximo ao próximo passo (menos de 20 metros), avançar
+          if (distanceToNextStep <= 20) {
+            nextStepIndex = currentStepIndex + 1;
+            shouldUpdateStep = true;
+            console.log(
+              "[updateRealTimeNavigation] Próximo do passo seguinte, avançando instruções"
+            );
+          }
+        } else {
+          console.warn(
+            "[updateRealTimeNavigation] Dados de coordenadas inválidos:",
+            {
+              nextStep: nextStep,
+              currentPos: {
+                latitude: currentPos.latitude,
+                longitude: currentPos.longitude,
+              },
+            }
+          );
+        }
+      }
+    }
+    // Se chegou ao último passo, verificar proximidade com o destino final
+    if (nextStepIndex === instructions.length - 1) {
+      const destination = navigationState.selectedDestination;
+      if (destination) {
+        checkDestinationArrival(currentPos.latitude, currentPos.longitude);
+      }
+    }
+
+    // Atualizar o passo se necessário
+    if (
+      shouldUpdateStep ||
+      navigationState.currentStepIndex !== nextStepIndex
+    ) {
+      navigationState.currentStepIndex = nextStepIndex;
+      displayNavigationStep(instructions[nextStepIndex]);
+    }
+
+    // Atualizar sempre a posição do marcador do usuário
+    updateUserMarker(
+      currentPos.latitude,
+      currentPos.longitude,
+      currentPos.heading
+    );
+
+    // CORREÇÃO: Calcular distância restante e tempo explicitamente
+    const remainingDistance = calculateRouteRemainingDistance(
+      currentPos,
+      instructions,
+      navigationState.currentStepIndex
+    );
+    const remainingTime = estimateRemainingTime(remainingDistance);
+
+    // Atualizações mais frequentes do banner
+    if (instructions[navigationState.currentStepIndex]) {
+      let currentInstruction = {
+        ...instructions[navigationState.currentStepIndex],
+      };
+
+      // Obter dados da rota completa para calcular progresso
+      const routeData = navigationState.routeData || getLastSavedRouteData();
+      const totalDistance =
+        routeData && routeData.properties
+          ? routeData.properties.summary.distance
+          : 500; // Valor padrão se não houver dados
+
+      // CORREÇÃO: Adicionar métricas atualizadas com tratamento de erro
+      currentInstruction.remainingDistance = formatDistance(remainingDistance);
+      currentInstruction.estimatedTime = formatDuration(remainingTime);
+      currentInstruction.progress = calculateRouteProgress(
+        remainingDistance,
+        totalDistance
+      );
+
+      console.log(
+        "[updateRealTimeNavigation] Banner atualizado com métricas:",
+        {
+          distância: currentInstruction.remainingDistance,
+          tempo: currentInstruction.estimatedTime,
+          progresso: currentInstruction.progress + "%",
+        }
+      );
+
+      // Atualizar o banner com os dados atualizados
+      updateInstructionBanner(currentInstruction);
+    }
+
+    // Atualizar a última posição processada
+    navigationState.lastProcessedPosition = {
+      latitude: currentPos.latitude,
+      longitude: currentPos.longitude,
+      accuracy: currentPos.accuracy,
+      heading: currentPos.heading,
+    };
+
+    return true;
+  } catch (error) {
+    console.error("[updateRealTimeNavigation] Error:", error);
+    return false;
+  }
+}
+
+// Add this to your navigationState initialization if not already present
+export function initNavigationState() {
+  // Initialize navigation state if not already done
+  if (!window.navigationState) {
+    window.navigationState = {
+      isActive: false,
+      isRotationEnabled: true, // Enable rotation by default
+      destination: null,
+      instructions: [],
+      currentStep: 0,
+      // other properties...
+    };
+  }
+  return window.navigationState;
 }
 
 /**
@@ -2199,13 +2278,10 @@ export default {
   calculateDistance,
   enableAutoRotation,
   disableAutoRotation,
-  navigationState,
   validateDestination,
   notifyDeviation,
   recalculateRoute,
 };
-
-// Na função setupRealTimeUpdates, adicione uma chamada para updateDirectionalMarker
 
 // Modificação na função setupRealTimeUpdates (por volta da linha 1679)
 
@@ -2224,7 +2300,7 @@ function setupRealTimeUpdates() {
 
     if (userLocation) {
       try {
-        // Obter pontos da rota
+        // Obter pontos da rota para orientação do marcador
         let routePoints = null;
 
         // Primeiro, tentar obter de lastRoutePoints (o mais atualizado)
@@ -2243,7 +2319,6 @@ function setupRealTimeUpdates() {
           navigationState.instructions &&
           navigationState.instructions.length > 0
         ) {
-          // Extrair coordenadas das instruções
           routePoints = navigationState.instructions
             .map((instruction) => ({
               lat: instruction.latitude || instruction.lat,
@@ -2252,60 +2327,185 @@ function setupRealTimeUpdates() {
             .filter((point) => point.lat && point.lng);
         }
 
-        // Se conseguimos obter pontos da rota, atualizar direção
+        // Se conseguimos obter pontos da rota, atualizar direção do marcador
         if (routePoints && routePoints.length > 0) {
-          // Chamada à função de atualização de direção
-          updateUserMarkerDirection(userLocation, routePoints);
+          const direction = updateUserMarkerDirection(
+            userLocation,
+            routePoints
+          );
+
+          // Se temos um heading válido (seja do dispositivo ou calculado da rota)
+          const heading = userLocation.heading || direction;
+
+          if (heading !== undefined && heading !== null) {
+            // 1. Atualizar o marcador do usuário com a direção
+            updateUserMarker(
+              userLocation.latitude,
+              userLocation.longitude,
+              heading,
+              userLocation.accuracy || 15
+            );
+
+            // 2. Se a rotação automática estiver ativa, rotacionar o mapa
+            if (navigationState.isRotationEnabled) {
+              setMapRotation(heading);
+            }
+
+            // 3. Centralizar o mapa na posição do usuário (com offset apropriado)
+            centerMapOnUser(userLocation.latitude, userLocation.longitude);
+          }
         }
+
+        // Continuar com a atualização normal de navegação
+        updateRealTimeNavigation(userLocation);
       } catch (error) {
         console.warn(
-          "[setupRealTimeUpdates] Erro ao atualizar direção do marcador:",
+          "[setupRealTimeUpdates] Erro ao atualizar direção:",
           error
         );
       }
-
-      // Continuar com a atualização normal de navegação
-      updateRealTimeNavigation(userLocation);
     }
-  }, 5000); // A cada 5 segundos
+  }, 1000); // A cada 1 segundo para maior fluidez
 
-  console.log(
-    "[setupRealTimeUpdates] Monitoramento de métricas em tempo real iniciado"
-  );
+  console.log("[setupRealTimeUpdates] Monitoramento em tempo real iniciado");
+}
+
+// Add these functions to your existing map-controls.js file
+
+/**
+ * Sets the map rotation based on the provided heading
+ * @param {number} heading - Heading in degrees (0-359)
+ */
+export function rotateMap(heading) {
+  if (!map || typeof heading !== "number" || isNaN(heading)) {
+    console.warn("[rotateMap] Invalid parameters:", { map, heading });
+    return;
+  }
+
+  try {
+    // Check if rotation is enabled in navigation state
+    const isRotationEnabled =
+      window.navigationState &&
+      window.navigationState.isActive &&
+      window.navigationState.isRotationEnabled;
+
+    if (!isRotationEnabled) {
+      // Reset to north if rotation is disabled
+      if (map.getBearing && map.getBearing() !== 0) {
+        map.resetBearing();
+      }
+      return;
+    }
+
+    // Apply rotation using the plugin if available
+    if (typeof map.setBearing === "function") {
+      map.setBearing(heading);
+      console.log(`[rotateMap] Map rotated to ${heading.toFixed(1)}°`);
+    } else {
+      console.warn("[rotateMap] Map rotation plugin not available");
+    }
+  } catch (error) {
+    console.error("[rotateMap] Error rotating map:", error);
+  }
 }
 
 /**
- * Configura e ativa a rotação do mapa
- * @param {number} angle - Ângulo de rotação em graus
+ * Centers the map on the user's position with appropriate offset
+ * @param {number} lat - User's latitude
+ * @param {number} lng - User's longitude
+ * @param {number} heading - User's heading (optional)
+ * @param {number} zoom - Zoom level (optional)
  */
-export function rotateMap(angle) {
-  try {
-    const mapInstance = window.map || (typeof map !== "undefined" ? map : null);
-
-    if (!mapInstance) {
-      console.error("[rotateMap] Mapa não encontrado");
-      return false;
-    }
-
-    console.log(`[rotateMap] Tentando rotacionar mapa para ${angle} graus`);
-
-    // Verificar se o método setBearing está disponível
-    if (typeof mapInstance.setBearing !== "function") {
-      console.error(
-        "[rotateMap] Método setBearing não está disponível. O plugin foi carregado?"
-      );
-      return false;
-    }
-
-    // Aplicar rotação
-    mapInstance.setBearing(angle);
-    console.log(`[rotateMap] Mapa rotacionado para ${angle} graus`);
-
-    return true;
-  } catch (error) {
-    console.error("[rotateMap] Erro ao rotacionar mapa:", error);
-    return false;
+export function centerMapOnUser(lat, lng, heading = null, zoom = null) {
+  if (!map || !lat || !lng || isNaN(lat) || isNaN(lng)) {
+    console.warn("[centerMapOnUser] Invalid parameters:", { map, lat, lng });
+    return;
   }
+
+  try {
+    // Check if we're in navigation mode
+    const isNavigating =
+      window.navigationState && window.navigationState.isActive;
+
+    // Determine zoom level
+    const zoomLevel = zoom !== null ? zoom : isNavigating ? 18 : map.getZoom();
+
+    // During navigation, apply an offset to see more of the route ahead
+    if (isNavigating) {
+      // Get the current bearing/heading
+      const userHeading =
+        heading !== null
+          ? heading
+          : window.userLocation && window.userLocation.heading
+          ? window.userLocation.heading
+          : 0;
+
+      // Calculate offset point (more area visible ahead of user)
+      const offsetPoint = calculatePointAhead(lat, lng, userHeading, 30); // 30 meters ahead
+
+      map.setView([offsetPoint.lat, offsetPoint.lng], zoomLevel, {
+        animate: true,
+        duration: 0.5,
+        easeLinearity: 0.25,
+      });
+
+      console.log(
+        `[centerMapOnUser] Map centered with forward offset: ${JSON.stringify(
+          offsetPoint
+        )}`
+      );
+    } else {
+      // Standard centering without offset
+      map.setView([lat, lng], zoomLevel, {
+        animate: true,
+        duration: 0.5,
+      });
+      console.log(`[centerMapOnUser] Map centered on position: ${lat}, ${lng}`);
+    }
+  } catch (error) {
+    console.error("[centerMapOnUser] Error centering map:", error);
+  }
+}
+
+/**
+ * Calculate a point ahead of the current position based on bearing
+ * @param {number} lat - Starting latitude
+ * @param {number} lng - Starting longitude
+ * @param {number} bearing - Direction in degrees
+ * @param {number} distance - Distance in meters
+ * @returns {Object} - {lat, lng} of the new point
+ */
+export function calculatePointAhead(lat, lng, bearing, distance) {
+  // Earth's radius in meters
+  const R = 6371000;
+
+  // Convert to radians
+  const latRad = (lat * Math.PI) / 180;
+  const lngRad = (lng * Math.PI) / 180;
+  const bearingRad = (bearing * Math.PI) / 180;
+
+  // Calculate angular distance
+  const angularDistance = distance / R;
+
+  // Calculate new latitude
+  const newLatRad = Math.asin(
+    Math.sin(latRad) * Math.cos(angularDistance) +
+      Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearingRad)
+  );
+
+  // Calculate new longitude
+  const newLngRad =
+    lngRad +
+    Math.atan2(
+      Math.sin(bearingRad) * Math.sin(angularDistance) * Math.cos(latRad),
+      Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(newLatRad)
+    );
+
+  // Convert back to degrees
+  const newLat = (newLatRad * 180) / Math.PI;
+  const newLng = (newLngRad * 180) / Math.PI;
+
+  return { lat: newLat, lng: newLng };
 }
 
 // Adicionar ao arquivo navigationController.js

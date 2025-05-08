@@ -1070,46 +1070,66 @@ export function adjustMapZoomBasedOnSpeed(speed) {
  * @param {number} heading - Ângulo de rotação em graus
  */
 export function setMapRotation(heading) {
-  // Validações
-  if (!map || !navigationState.isActive || !navigationState.isRotationEnabled) {
+  // Validações robustas
+  if (!map || typeof heading !== "number" || isNaN(heading)) {
+    console.warn("[setMapRotation] Parâmetros inválidos:", { map, heading });
     return;
   }
 
-  const angle = heading !== null && heading !== undefined ? heading : 0;
+  if (!navigationState.isActive || !navigationState.isRotationEnabled) {
+    return;
+  }
 
   try {
+    // Normalizar ângulo para valores entre 0-360
+    const angle = ((heading % 360) + 360) % 360;
+
     // Se o plugin oficial está disponível
     if (typeof map.setBearing === "function") {
       map.setBearing(angle);
+      console.log(`[setMapRotation] Mapa rotacionado via plugin: ${angle}°`);
     }
     // Implementação manual
     else {
       const tilePane = document.querySelector(".leaflet-tile-pane");
       const controlPane = document.querySelector(".leaflet-control-container");
-      const rotationAngle = angle;
+      const mapPane = document.querySelector(".leaflet-map-pane");
+
+      if (!tilePane || !controlPane) {
+        console.warn("[setMapRotation] Elementos do mapa não encontrados");
+        return;
+      }
+
+      // Aplicar rotação ao mapa
+      const rotationAngle = -angle; // Inverter para rotação correta
+
+      // Usar transformOrigin para rotacionar ao redor do centro
+      if (mapPane) {
+        mapPane.style.transformOrigin = "center center";
+      }
 
       if (tilePane) {
         tilePane.style.transition = "transform 0.3s ease-out";
-        tilePane.style.transform = `rotate(${rotationAngle}deg)`;
         tilePane.style.transformOrigin = "center center";
+        tilePane.style.transform = `rotate(${rotationAngle}deg)`;
       }
 
       // Manter controles sempre na orientação normal
       if (controlPane) {
         controlPane.style.transition = "transform 0.3s ease-out";
+        controlPane.style.transformOrigin = "center center";
         controlPane.style.transform = `rotate(${-rotationAngle}deg)`;
       }
 
-      // Definir variáveis CSS para contra-rotação
-      document.documentElement.style.setProperty(
-        "--map-rotation",
-        `${angle}deg`
-      );
-      document.documentElement.style.setProperty(
-        "--map-rotation-inverse",
-        `${-angle}deg`
-      );
+      console.log(`[setMapRotation] Mapa rotacionado manualmente: ${angle}°`);
     }
+
+    // Definir variáveis CSS para contra-rotação
+    document.documentElement.style.setProperty("--map-rotation", `${angle}deg`);
+    document.documentElement.style.setProperty(
+      "--map-rotation-inverse",
+      `${-angle}deg`
+    );
 
     // Atualizar estado
     navigationState.currentHeading = angle;

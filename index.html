@@ -12,17 +12,20 @@
     />
     <title>Morro Digital</title>
     <link rel="stylesheet" href="./css/main.css" />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
-    />
-<!-- Certificar-se que o Leaflet é carregado antes do plugin -->
+
+
+<!-- Carregar Leaflet primeiro (versão única) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- Carregar apenas uma versão do Leaflet -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Adicionar plugins necessários para rotação -->
+<script src="./js/plugins/leaflet.rotatedMarker.js"></script>
+<script src="./js/plugins/leaflet.mapbearing.js"></script>
+<!-- Carregar o plugin polylineDecorator apenas uma vez -->
 <script src="./js/lib/leaflet.polylineDecorator.js"></script>
-<script src="js/lib/leaflet.polylineDecorator.js"></script>
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <!-- Removido leaflet-routing-machine pois não será mais usado -->
-    <link
+
+
+<link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.css"
     />
@@ -136,6 +139,11 @@
     <div class="instruction-extra">
       <p id="instruction-distance">📏: 200m</p>
       <p id="instruction-time">⏱️: 2 minutos</p>
+    </div>
+    <!-- Adicionar o elemento de progresso que está faltando -->
+    <div id="route-progress-container">
+      <progress id="route-progress" value="0" max="100"></progress>
+      <span id="progress-text">0%</span>
     </div>
   </div>
 </div>

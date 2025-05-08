@@ -145,6 +145,13 @@ function initApp() {
 
   showWeatherWidget();
 
+  // Adicionar após a declaração da função showWeatherWidget
+  document.addEventListener("languageChanged", async () => {
+    // Atualizar o widget quando o idioma for alterado
+    if (typeof updateWidget === "function") {
+      await updateWidget();
+    }
+  });
   initializeAssistant({
     map: map,
     lang: language,

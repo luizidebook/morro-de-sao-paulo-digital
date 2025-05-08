@@ -362,6 +362,38 @@ function getTranslations(lang) {
       navigation_arrive_at_your_destination_on_the_right:
         "Chegou ao seu destino, à direita",
       // Adicione estas traduções para clima
+      // Meteorologia
+      weather_high: "Máxima",
+      weather_low: "Mínima",
+      weather_rain: "Chuva",
+      weather_humidity: "Umidade",
+      weather_wind: "Vento",
+      weather_wind_unit: "km/h",
+      weather_visibility: "Visibilidade",
+      weather_visibility_good: "Boa",
+      weather_today: "Hoje",
+      weather_error_fetch:
+        "Não foi possível obter dados meteorológicos. Tente novamente mais tarde.",
+
+      // Condições climáticas
+      weather_thunderstorm: "Tempestades com trovoadas",
+      weather_thunderstorm_rain: "Tempestades com chuva",
+      weather_heavy_rain: "Chuva forte",
+      weather_light_rain: "Chuva leve",
+      weather_rain: "Chuva",
+      weather_shower: "Pancadas de chuva",
+      weather_partly_cloudy: "Parcialmente nublado",
+      weather_mostly_cloudy: "Majoritariamente nublado",
+      weather_overcast: "Encoberto",
+      weather_cloudy: "Nublado",
+      weather_fog: "Névoa ou neblina",
+      weather_clear: "Céu limpo",
+      weather_sunny: "Ensolarado",
+      weather_snow: "Neve",
+      weather_hail: "Granizo",
+      weather_sleet: "Aguaneve",
+      weather_fair: "Bom tempo",
+      weather_unknown: "Sem informações",
       weather_chuva: "Chuva",
       weather_rain_light: "Chuva leve",
       weather_rain_moderate: "Chuva moderada",
@@ -386,6 +418,57 @@ function getTranslations(lang) {
       weather_thunderstorm: "Tempestade com trovoadas",
       weather_hurricane: "Furacão",
       weather_tropical_storm: "Tempestade tropical",
+
+      // Dicas de clima
+      weather_tip_storm:
+        "💡 Recomendamos evitar sair durante tempestades. Se necessário, fique longe de árvores e postes.",
+      weather_tip_heavy_rain:
+        "💡 Não se esqueça de levar um guarda-chuva ou capa de chuva hoje!",
+      weather_tip_rain_chance:
+        "💡 Há chance de chuva, considere levar um guarda-chuva.",
+      weather_tip_hot:
+        "💡 Dia quente! Use protetor solar, mantenha-se hidratado e procure áreas com sombra.",
+      weather_tip_cool:
+        "💡 O dia está fresco, leve um agasalho leve para aproveitar melhor seu passeio.",
+      weather_tip_sunny:
+        "💡 Dia ensolarado perfeito para aproveitar as praias! Não esqueça o protetor solar.",
+      weather_tip_cloudy:
+        "💡 Dia nublado, bom para caminhadas mais longas sem calor excessivo.",
+      weather_tip_fog:
+        "💡 Com névoa, tenha atenção redobrada em trilhas e caminhos.",
+      weather_tip_default: "💡 Aproveite seu dia em Morro de São Paulo!",
+
+      // Marés
+      tide_forecast: "Previsão da Maré",
+      tide_data_unavailable:
+        "Dados de maré não disponíveis para este dia. Por favor, tente novamente mais tarde.",
+      tide_high: "Preamar (Alta)",
+      tide_low: "Baixa-mar",
+      tide_high_single: "Alta",
+      tide_low_single: "Baixa",
+      tide_high_type: "alta",
+      tide_low_type: "baixa",
+      not_available: "Não disponível",
+
+      // Formatação de tempo para marés
+      tide_time_hours_minutes:
+        "{hours}h{minutes, plural, =0 {} other { {minutes}min}}",
+      tide_time_minutes: "{minutes} minutos",
+
+      // Alertas de maré
+      tide_alert_title: "Alerta de Maré {type}",
+      tide_alert_message:
+        "Próxima maré {type} em {time} ({hour}). Nível previsto: {level}m.",
+
+      // Previsão matinal
+      weather_morning_forecast_title: "Bom dia! ☀️ Previsão de hoje",
+      weather_morning_forecast:
+        "Hoje teremos máxima de {high}°C, mínima de {low}°C. Clima {condition}.",
+
+      // Novas entradas para o português
+      weather_click_here: "Clique aqui",
+      weather_update_error: "Não foi possível atualizar o clima.",
+      weather_clear_conditions: "Condições claras",
     };
 
     // Armazenar as traduções básicas

@@ -45,6 +45,7 @@ import {
   startPositionTracking,
   updateUserMarker,
   userLocation,
+  updateUserMarkerDirection,
 } from "../navigationUserLocation/user-location.js";
 
 // State management
@@ -73,6 +74,105 @@ function checkPlugins() {
   return rotatePluginAvailable && markerRotateAvailable;
 }
 
+/**
+ * Ferramenta de diagnóstico para o sistema de navegação
+ */
+
+export function runNavigationDiagnostic() {
+  console.group("Diagnóstico do Sistema de Navegação");
+
+  // 1. Verificar disponibilidade de recursos de geolocalização
+  const geoAvailable = "geolocation" in navigator;
+  console.log(
+    `1. Geolocalização: ${geoAvailable ? "✅ Disponível" : "❌ Indisponível"}`
+  );
+
+  // 2. Verificar plugins necessários
+  const leafletAvailable = typeof L !== "undefined";
+  console.log(
+    `2. Leaflet: ${leafletAvailable ? "✅ Disponível" : "❌ Não carregado"}`
+  );
+
+  // Verificar plugins específicos se Leaflet estiver disponível
+  if (leafletAvailable) {
+    const rotatedMarkerPlugin =
+      typeof L.Marker.prototype.setRotationAngle === "function";
+    console.log(
+      `3. Plugin de rotação de marcadores: ${
+        rotatedMarkerPlugin ? "✅ Disponível" : "❌ Não carregado"
+      }`
+    );
+
+    const mapBearingPlugin = typeof L.Map.prototype.setBearing === "function";
+    console.log(
+      `4. Plugin de rotação de mapa: ${
+        mapBearingPlugin ? "✅ Disponível" : "❌ Não carregado"
+      }`
+    );
+
+    const polylineDecoratorPlugin = typeof L.polylineDecorator === "function";
+    console.log(
+      `5. Plugin de decoração de linhas: ${
+        polylineDecoratorPlugin ? "✅ Disponível" : "❌ Não carregado"
+      }`
+    );
+  }
+
+  // 3. Verificar componentes de UI
+  const banner = document.getElementById("instruction-banner");
+  console.log(
+    `6. Banner de instruções: ${banner ? "✅ Presente no DOM" : "❌ Ausente"}`
+  );
+
+  if (banner) {
+    const requiredElements = [
+      "instruction-arrow",
+      "instruction-main",
+      "instruction-details",
+      "instruction-distance",
+      "instruction-time",
+      "route-progress",
+      "progress-text",
+      "minimize-navigation-btn",
+    ];
+
+    console.group("   Elementos do banner:");
+    for (const id of requiredElements) {
+      const elem = document.getElementById(id);
+      console.log(`   - ${id}: ${elem ? "✅ Presente" : "❌ Ausente"}`);
+    }
+    console.groupEnd();
+  }
+
+  // 4. Verificar traduções necessárias
+  try {
+    const criticalTranslations = [
+      "navigation_turn_left",
+      "navigation_turn_right",
+      "navigation_on",
+      "navigation_for",
+    ];
+
+    console.group("7. Traduções críticas:");
+
+    import("../../i18n/translatePageContent.js").then((module) => {
+      const { getGeneralText } = module;
+
+      criticalTranslations.forEach((key) => {
+        const hasTranslation = getGeneralText(key, "pt") !== key;
+        console.log(
+          `   - ${key}: ${hasTranslation ? "✅ Presente" : "❌ Ausente"}`
+        );
+      });
+    });
+
+    console.groupEnd();
+  } catch (error) {
+    console.log("7. Erro ao verificar traduções:", error);
+  }
+
+  console.groupEnd();
+}
 /**
  * Inicia a navegação para um destino específico
  *
@@ -117,6 +217,15 @@ export async function startNavigation(destination) {
 
     // Atualizar estado de navegação
     navigationState.isActive = true;
+    navigationState.isPaused = false;
+    navigationState.currentStepIndex = 0;
+    navigationState.arrivalNotified = false;
+    navigationState.deviationDetected = false;
+    navigationState.instructions = [];
+    navigationState.routeData = null;
+    navigationState.lastProcessedPosition = null;
+    navigationState.lastUpdateTime = Date.now();
+
     navigationState.destination = destination;
 
     // Mostrar indicador de carregamento
@@ -221,9 +330,11 @@ export async function startNavigation(destination) {
     }
 
     // Esperar explicitamente que o processamento de instruções complete
-    // CORREÇÃO: Passar routeData completo, não apenas steps
+    // Na função startNavigation, após processar instruções:
+
+    // Esperar explicitamente que o processamento de instruções complete
     const processedInstructions = await processRouteInstructions(
-      routeData, // Passar routeData completo
+      routeData,
       navigationState.lang
     );
 
@@ -237,10 +348,79 @@ export async function startNavigation(destination) {
       return false;
     }
 
-    // Atualizar o estado com as instruções processadas
-    navigationState.instructions = processedInstructions;
-    console.log("5. Instruções processadas", processedInstructions.length);
+    // VERIFICAR: Imprimir estrutura das instruções para diagnóstico
+    console.log("[startNavigation] Verificando estrutura das instruções:");
+    processedInstructions.forEach((instruction, idx) => {
+      const hasValidCoords =
+        ((instruction.latitude !== undefined && !isNaN(instruction.latitude)) ||
+          (instruction.lat !== undefined && !isNaN(instruction.lat))) &&
+        ((instruction.longitude !== undefined &&
+          !isNaN(instruction.longitude)) ||
+          (instruction.lon !== undefined && !isNaN(instruction.lon)) ||
+          (instruction.lng !== undefined && !isNaN(instruction.lng)));
 
+      console.log(
+        `Passo ${idx}: "${instruction.original}" - Coords válidas: ${
+          hasValidCoords ? "✓" : "✗"
+        }`
+      );
+
+      // Se não tiver coordenadas válidas, tentar extrair do texto
+      if (!hasValidCoords && instruction.original) {
+        // Tente extrair de outras propriedades ou conteúdo geométrico
+        const fixedCoords = extractCoordinatesFromGeometry(routeData, idx);
+        if (fixedCoords) {
+          instruction.latitude = fixedCoords.latitude;
+          instruction.longitude = fixedCoords.longitude;
+          console.log(
+            `   Coordenadas recuperadas: Lat ${fixedCoords.latitude}, Lon ${fixedCoords.longitude}`
+          );
+        }
+      }
+    });
+
+    // MODIFICAR: Normalizar as instruções antes de armazenar
+    const normalizedInstructions = normalizeInstructions(processedInstructions);
+
+    // VERIFICAR: Confirmar que as instruções estão normalizadas corretamente
+    const validInstructions = normalizedInstructions.filter(
+      (instr) =>
+        instr.latitude !== undefined &&
+        !isNaN(instr.latitude) &&
+        instr.longitude !== undefined &&
+        !isNaN(instr.longitude)
+    );
+
+    if (validInstructions.length < normalizedInstructions.length * 0.5) {
+      console.error(
+        "[startNavigation] Menos de 50% das instruções têm coordenadas válidas!"
+      );
+      console.log("[startNavigation] Tentativa de recuperação...");
+
+      // Tentar extrair coordenadas diretamente da geometria da rota
+      const fixedInstructions = extractCoordinatesFromRoute(
+        routeData,
+        normalizedInstructions
+      );
+      if (fixedInstructions && fixedInstructions.length > 0) {
+        navigationState.instructions = fixedInstructions;
+        console.log(
+          `5. Instruções recuperadas e processadas: ${fixedInstructions.length}`
+        );
+      } else {
+        showNotification(
+          getGeneralText("route_error", navigationState.lang),
+          "error"
+        );
+        return false;
+      }
+    } else {
+      // Usar instruções normalizadas
+      navigationState.instructions = normalizedInstructions;
+      console.log(
+        `5. Instruções processadas: ${normalizedInstructions.length}`
+      );
+    }
     // CORREÇÃO: ORDEM ALTERADA - primeiro criar e mostrar o banner, depois controles
     // 7. Criar e mostrar o banner
     console.log("[startNavigation] Criando e exibindo banner de navegação");
@@ -303,11 +483,9 @@ export async function startNavigation(destination) {
       );
     }
 
-    // Chamar esta função no final de startNavigation()
     setupRealTimeUpdates();
-
-    // ADICIONAR: Configurar verificação de integridade do banner
     setupBannerIntegrityCheck();
+    setupInitialMarkerOrientation();
 
     console.groupEnd();
     return true;
@@ -316,6 +494,285 @@ export async function startNavigation(destination) {
     console.groupEnd();
     return false;
   }
+}
+
+// Adicionar nova função
+
+/**
+ * Configura a orientação inicial do marcador do usuário para a rota
+ */
+function setupInitialMarkerOrientation() {
+  if (!userLocation || !userLocation.latitude || !userLocation.longitude) {
+    console.warn(
+      "[setupInitialMarkerOrientation] Posição do usuário indisponível"
+    );
+    return;
+  }
+
+  // Obter pontos da rota
+  let routePoints = window.lastRoutePoints;
+
+  // Tentar outras fontes se não disponível
+  if (!routePoints && window.currentRoute && window.currentRoute.getLatLngs) {
+    routePoints = window.currentRoute.getLatLngs();
+  }
+
+  // Tentar extrair de navigationState se necessário
+  if (
+    (!routePoints || routePoints.length === 0) &&
+    navigationState.instructions
+  ) {
+    routePoints = navigationState.instructions
+      .map((instruction) => ({
+        lat: instruction.latitude || instruction.lat,
+        lng: instruction.longitude || instruction.lon || instruction.lng,
+      }))
+      .filter((point) => point.lat && point.lng);
+  }
+
+  if (!routePoints || routePoints.length === 0) {
+    console.warn(
+      "[setupInitialMarkerOrientation] Pontos da rota indisponíveis"
+    );
+    return;
+  }
+
+  // Atualizar orientação do marcador
+  console.log(
+    "[setupInitialMarkerOrientation] Configurando orientação inicial do marcador"
+  );
+  updateUserMarkerDirection(userLocation, routePoints, true);
+}
+
+/**
+ * Extrai coordenadas dos dados geométricos da rota
+ * @param {Object} routeData - Dados GeoJSON da rota
+ * @param {Array} instructions - Instruções a serem mapeadas
+ * @returns {Array} - Instruções com coordenadas corretas
+ */
+function extractCoordinatesFromRoute(routeData, instructions) {
+  if (!routeData || !routeData.features || !routeData.features[0]) {
+    console.error("[extractCoordinatesFromRoute] Dados da rota inválidos");
+    return null;
+  }
+
+  try {
+    // Obter geometria da rota
+    const geometry = routeData.features[0].geometry;
+    if (
+      !geometry ||
+      !geometry.coordinates ||
+      !Array.isArray(geometry.coordinates)
+    ) {
+      console.error("[extractCoordinatesFromRoute] Geometria inválida");
+      return null;
+    }
+
+    // Mapear pontos de rota para instruções
+    const routePoints = geometry.coordinates;
+
+    // Se houver way_points nas instruções, usá-los
+    const instructionsWithWaypoints = instructions.map((instruction, index) => {
+      const wayPointIndices = instruction.way_points;
+
+      if (Array.isArray(wayPointIndices) && wayPointIndices.length >= 1) {
+        const pointIndex = wayPointIndices[0]; // Geralmente o início do segmento
+
+        if (routePoints[pointIndex]) {
+          // Coordenadas GeoJSON são [longitude, latitude]
+          const point = routePoints[pointIndex];
+          return {
+            ...instruction,
+            longitude: point[0],
+            latitude: point[1],
+          };
+        }
+      }
+
+      // Fallback: distribuir pontos uniformemente se não houver way_points
+      const pointIndex = Math.floor(
+        (index / instructions.length) * routePoints.length
+      );
+      if (routePoints[pointIndex]) {
+        return {
+          ...instruction,
+          longitude: routePoints[pointIndex][0],
+          latitude: routePoints[pointIndex][1],
+        };
+      }
+
+      return instruction;
+    });
+
+    return instructionsWithWaypoints;
+  } catch (error) {
+    console.error(
+      "[extractCoordinatesFromRoute] Erro ao extrair coordenadas:",
+      error
+    );
+    return null;
+  }
+}
+
+/**
+ * Extrai coordenadas específicas para uma instrução da geometria da rota
+ * @param {Object} routeData - Dados GeoJSON da rota
+ * @param {number} stepIndex - Índice da instrução
+ * @returns {Object|null} - Coordenadas normalizadas ou null
+ */
+function extractCoordinatesFromGeometry(routeData, stepIndex) {
+  if (!routeData || !routeData.features || !routeData.features[0]) {
+    return null;
+  }
+
+  try {
+    // Obter geometria da rota
+    const geometry = routeData.features[0].geometry;
+    if (
+      !geometry ||
+      !geometry.coordinates ||
+      !Array.isArray(geometry.coordinates)
+    ) {
+      return null;
+    }
+
+    // Obter propriedades para encontrar way_points
+    const properties = routeData.features[0].properties;
+    const segments = properties?.segments || [];
+    const steps = segments[0]?.steps || [];
+
+    // Verificar se temos o passo correspondente
+    if (steps[stepIndex]) {
+      const wayPoints = steps[stepIndex].way_points;
+
+      if (Array.isArray(wayPoints) && wayPoints.length >= 1) {
+        const pointIndex = wayPoints[0]; // Geralmente o início do segmento
+
+        if (geometry.coordinates[pointIndex]) {
+          // Coordenadas GeoJSON são [longitude, latitude]
+          const point = geometry.coordinates[pointIndex];
+          return {
+            longitude: point[0],
+            latitude: point[1],
+          };
+        }
+      }
+    }
+
+    // Fallback: distribuir pontos uniformemente
+    const pointIndex = Math.floor(
+      (stepIndex / steps.length) * geometry.coordinates.length
+    );
+    if (geometry.coordinates[pointIndex]) {
+      return {
+        longitude: geometry.coordinates[pointIndex][0],
+        latitude: geometry.coordinates[pointIndex][1],
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("[extractCoordinatesFromGeometry] Erro:", error);
+    return null;
+  }
+}
+
+// Adicionar função de diagnóstico:
+
+/**
+ * Gera um relatório detalhado do estado atual da navegação
+ * @param {string} [title="Diagnóstico de Navegação"] - Título do relatório
+ */
+export function diagnosticReport(title = "Diagnóstico de Navegação") {
+  console.group(title);
+
+  // Estado geral
+  console.log("Estado da navegação:", {
+    ativa: navigationState.isActive,
+    pausada: navigationState.isPaused,
+    passoAtual: navigationState.currentStepIndex,
+    totalPassos: navigationState.instructions?.length || 0,
+    destino: navigationState.selectedDestination,
+  });
+
+  // Verificar instruções
+  if (navigationState.instructions && navigationState.instructions.length > 0) {
+    console.group("Instruções:");
+
+    navigationState.instructions.forEach((instruction, index) => {
+      const isCurrentStep = index === navigationState.currentStepIndex;
+
+      console.log(
+        `${isCurrentStep ? "→" : " "} Passo ${index}: ${
+          instruction.original || "?"
+        }`
+      );
+
+      const coords = {
+        lat: instruction.latitude || instruction.lat,
+        lon: instruction.longitude || instruction.lon || instruction.lng,
+      };
+
+      const hasValidCoords =
+        coords.lat !== undefined &&
+        !isNaN(coords.lat) &&
+        coords.lon !== undefined &&
+        !isNaN(coords.lon);
+
+      console.log(
+        `   Coordenadas: ${
+          hasValidCoords
+            ? `Lat ${coords.lat}, Lon ${coords.lon}`
+            : "❌ INVÁLIDAS"
+        }`
+      );
+    });
+
+    console.groupEnd();
+  } else {
+    console.log("❌ Sem instruções disponíveis");
+  }
+
+  // Verificar posição atual
+  console.log(
+    "Posição atual:",
+    userLocation
+      ? {
+          lat: userLocation.latitude,
+          lon: userLocation.longitude,
+          precisão: userLocation.accuracy || "N/A",
+          heading: userLocation.heading || "N/A",
+        }
+      : "❌ Indefinida"
+  );
+
+  // Destino
+  if (navigationState.selectedDestination) {
+    const destination = navigationState.selectedDestination;
+    console.log("Destino:", {
+      nome: destination.name || "Destino sem nome",
+      lat: destination.lat,
+      lon: destination.lon,
+    });
+
+    // Se temos posição e destino, calcular distância
+    if (userLocation && userLocation.latitude && userLocation.longitude) {
+      const distanceToDestination = calculateDistance(
+        userLocation.latitude,
+        userLocation.longitude,
+        destination.lat,
+        destination.lon
+      );
+
+      console.log(
+        `Distância até o destino: ${distanceToDestination.toFixed(1)}m`
+      );
+    }
+  } else {
+    console.log("❌ Destino indefinido");
+  }
+
+  console.groupEnd();
 }
 
 /**
@@ -768,12 +1225,33 @@ export function updateRealTimeNavigation(userPos = null) {
   // Usar o parâmetro se fornecido, caso contrário usar a variável global
   const currentPos = userPos || userLocation;
 
-  // Validar se temos uma posição válida
-  if (!currentPos || !currentPos.latitude || !currentPos.longitude) {
-    console.warn(
-      "[updateRealTimeNavigation] Posição do usuário inválida ou indisponível"
+  // Validação mais rigorosa
+  if (!currentPos) {
+    console.warn("[updateRealTimeNavigation] Posição indefinida");
+    return;
+  }
+
+  if (typeof currentPos !== "object") {
+    console.error(
+      "[updateRealTimeNavigation] Tipo inválido de posição:",
+      typeof currentPos
     );
-    return; // Sair da função se não houver posição válida
+    return;
+  }
+
+  if (
+    !currentPos.latitude ||
+    !currentPos.longitude ||
+    isNaN(currentPos.latitude) ||
+    isNaN(currentPos.longitude) ||
+    Math.abs(currentPos.latitude) > 90 ||
+    Math.abs(currentPos.longitude) > 180
+  ) {
+    console.warn(
+      "[updateRealTimeNavigation] Posição com coordenadas inválidas:",
+      currentPos
+    );
+    return;
   }
 
   console.log("[updateRealTimeNavigation] Atualizando com posição:", {
@@ -787,7 +1265,7 @@ export function updateRealTimeNavigation(userPos = null) {
 
   // Se não houver mudança significativa na posição, ignorar atualização
   if (navigationState.lastProcessedPosition) {
-    const minDistanceChange = 5; // metros
+    const MOVEMENT_THRESHOLD = 3; // Metros (reduzido para maior sensibilidade)
     const distanceMoved = calculateDistance(
       currentPos.latitude,
       currentPos.longitude,
@@ -795,12 +1273,25 @@ export function updateRealTimeNavigation(userPos = null) {
       navigationState.lastProcessedPosition.longitude
     );
 
-    if (distanceMoved < minDistanceChange) {
+    // Verificar quando foi a última atualização
+    const now = Date.now();
+    const lastUpdateTime = navigationState.lastUpdateTime || 0;
+    const timeSinceLastUpdate = now - lastUpdateTime;
+    const FORCE_UPDATE_INTERVAL = 10000; // 10 segundos
+
+    // Forçar atualização se passou tempo suficiente, mesmo sem movimento
+    if (
+      distanceMoved < MOVEMENT_THRESHOLD &&
+      timeSinceLastUpdate < FORCE_UPDATE_INTERVAL
+    ) {
       console.log(
         "[updateRealTimeNavigation] Movimento insignificante, ignorando atualização"
       );
       return; // Ignorar atualizações muito próximas
     }
+
+    // Atualizar timestamp da última atualização
+    navigationState.lastUpdateTime = now;
   }
 
   // Determinar qual passo atual deve ser exibido
@@ -814,31 +1305,111 @@ export function updateRealTimeNavigation(userPos = null) {
     const nextStep = instructions[currentStepIndex + 1];
 
     if (currentStep && nextStep) {
-      // Calcular distância até o próximo passo
-      const distanceToNextStep = calculateDistance(
-        currentPos.latitude,
-        currentPos.longitude,
-        nextStep.latitude || nextStep.lat,
-        nextStep.longitude || nextStep.lon
-      );
+      // Extrair coordenadas do próximo passo com mais robustez
+      const nextStepLat =
+        nextStep.latitude ||
+        nextStep.lat ||
+        (nextStep.location && nextStep.location[0]) ||
+        (nextStep.coordinates && nextStep.coordinates[0]);
 
-      console.log(
-        `[updateRealTimeNavigation] Distância até próximo passo: ${distanceToNextStep.toFixed(
-          1
-        )}m`
-      );
+      const nextStepLon =
+        nextStep.longitude ||
+        nextStep.lon ||
+        nextStep.lng ||
+        (nextStep.location && nextStep.location[1]) ||
+        (nextStep.coordinates && nextStep.coordinates[1]);
 
-      // Se estiver próximo ao próximo passo (menos de 20 metros), avançar
-      if (distanceToNextStep <= 20) {
-        nextStepIndex = currentStepIndex + 1;
-        shouldUpdateStep = true;
+      // Imprimir valores para diagnóstico
+      console.log("[updateRealTimeNavigation] Extraindo coordenadas:", {
+        nextStep: {
+          original: nextStep,
+          lat: nextStepLat,
+          lon: nextStepLon,
+        },
+        currentPos: {
+          lat: currentPos.latitude,
+          lon: currentPos.longitude,
+        },
+      });
+
+      // Verificar validade explicitamente
+      if (
+        nextStepLat !== undefined &&
+        nextStepLat !== null &&
+        !isNaN(parseFloat(nextStepLat)) &&
+        nextStepLon !== undefined &&
+        nextStepLon !== null &&
+        !isNaN(parseFloat(nextStepLon)) &&
+        currentPos.latitude !== undefined &&
+        !isNaN(parseFloat(currentPos.latitude)) &&
+        currentPos.longitude !== undefined &&
+        !isNaN(parseFloat(currentPos.longitude))
+      ) {
+        // ADICIONAR: Calcular o ângulo para o próximo passo
+        const bearing = calculateBearing(
+          parseFloat(currentPos.latitude),
+          parseFloat(currentPos.longitude),
+          parseFloat(nextStepLat),
+          parseFloat(nextStepLon)
+        );
+
+        // MODIFICAÇÃO: Passar o ângulo já corrigido para evitar dupla correção
+        const correctedBearing = (bearing + 180) % 360;
+
+        // ADICIONAR: Atualizar o marcador com a orientação para o próximo passo
+        updateUserMarker(
+          currentPos.latitude,
+          currentPos.longitude,
+          correctedBearing, // Usar o ângulo já corrigido
+          currentPos.accuracy || 15
+        );
+
         console.log(
-          "[updateRealTimeNavigation] Próximo do passo seguinte, avançando instruções"
+          `[updateRealTimeNavigation] Marcador orientado para próximo passo: ${bearing.toFixed(
+            1
+          )}°`
+        );
+
+        // Resto do código existente (cálculo de distância, etc.)
+        // Converter explicitamente para números para garantir operações matemáticas corretas
+        const lat1 = parseFloat(currentPos.latitude);
+        const lon1 = parseFloat(currentPos.longitude);
+        const lat2 = parseFloat(nextStepLat);
+        const lon2 = parseFloat(nextStepLon);
+
+        const distanceToNextStep = calculateDistance(lat1, lon1, lat2, lon2);
+
+        console.log(
+          `[updateRealTimeNavigation] Distância até próximo passo: ${distanceToNextStep.toFixed(
+            1
+          )}m`
+        );
+
+        // Monitorar aproximação de curvas
+        monitorApproachingTurn(currentPos, nextStep, distanceToNextStep);
+
+        // Se estiver próximo ao próximo passo (menos de 20 metros), avançar
+        if (distanceToNextStep <= 20) {
+          nextStepIndex = currentStepIndex + 1;
+          shouldUpdateStep = true;
+          console.log(
+            "[updateRealTimeNavigation] Próximo do passo seguinte, avançando instruções"
+          );
+        }
+      } else {
+        console.warn(
+          "[updateRealTimeNavigation] Dados de coordenadas inválidos:",
+          {
+            nextStep: nextStep,
+            currentPos: {
+              latitude: currentPos.latitude,
+              longitude: currentPos.longitude,
+            },
+          }
         );
       }
     }
   }
-
   // Se chegou ao último passo, verificar proximidade com o destino final
   if (nextStepIndex === instructions.length - 1) {
     const destination = navigationState.selectedDestination;
@@ -906,6 +1477,256 @@ export function updateRealTimeNavigation(userPos = null) {
     accuracy: currentPos.accuracy,
     heading: currentPos.heading,
   };
+}
+
+/**
+ * Verifica se os plugins necessários para rotação estão carregados
+ * @returns {boolean} Se os plugins estão disponíveis
+ */
+export function checkRotationPluginsAvailability() {
+  // Verificar rotação de marcadores
+  const markerRotationAvailable =
+    typeof L !== "undefined" &&
+    typeof L.Marker.prototype.setRotationAngle === "function";
+
+  // Verificar rotação de mapa
+  const mapRotationAvailable =
+    typeof L !== "undefined" &&
+    typeof L.Map.prototype.setBearing === "function";
+
+  console.log("[checkRotationPluginsAvailability] Plugins de rotação:", {
+    marcador: markerRotationAvailable ? "✅ Disponível" : "❌ Não carregado",
+    mapa: mapRotationAvailable ? "✅ Disponível" : "❌ Não carregado",
+  });
+
+  return markerRotationAvailable && mapRotationAvailable;
+}
+
+// Chamar no início da aplicação ou ao inicializar o mapa
+/**
+ * Extrai coordenadas de dados GeoJSON ou outros formatos de maneira robusta
+ * @param {Object} point - Ponto a ser normalizado
+ * @returns {Object} - Objeto com latitude e longitude normalizadas
+ */
+function normalizeCoordinates(point) {
+  if (!point) return null;
+
+  // Inicializar coordenadas
+  let lat = null,
+    lon = null;
+
+  // Caso 1: Objeto já tem latitude/longitude
+  if (
+    typeof point.latitude === "number" &&
+    typeof point.longitude === "number"
+  ) {
+    lat = point.latitude;
+    lon = point.longitude;
+  }
+  // Caso 2: Objeto tem lat/lon ou lat/lng
+  else if (
+    typeof point.lat === "number" &&
+    (typeof point.lon === "number" || typeof point.lng === "number")
+  ) {
+    lat = point.lat;
+    lon = point.lon || point.lng;
+  }
+  // Caso 3: Formato GeoJSON (coordinates: [lon, lat])
+  else if (Array.isArray(point.coordinates) && point.coordinates.length >= 2) {
+    // GeoJSON usa [longitude, latitude]
+    lon = point.coordinates[0];
+    lat = point.coordinates[1];
+  }
+  // Caso 4: Array [lat, lon]
+  else if (Array.isArray(point) && point.length >= 2) {
+    // Decisão baseada em magnitude (latitude geralmente < 90)
+    if (Math.abs(point[0]) <= 90 && Math.abs(point[1]) <= 180) {
+      lat = point[0];
+      lon = point[1];
+    } else {
+      // Provavelmente [lon, lat]
+      lon = point[0];
+      lat = point[1];
+    }
+  }
+
+  // Validar
+  if (lat === null || lon === null || isNaN(lat) || isNaN(lon)) {
+    console.warn(
+      "[normalizeCoordinates] Não foi possível extrair coordenadas válidas:",
+      point
+    );
+    return null;
+  }
+
+  return { latitude: lat, longitude: lon };
+}
+
+// Adicionar função de diagnóstico e recuperação:
+
+/**
+ * Diagnostica e recupera navegação com problemas
+ * @param {Error} error - Erro capturado
+ * @param {Object} state - Estado atual de navegação
+ * @returns {boolean} - Se conseguiu recuperar
+ */
+function recoverFromNavigationError(error, state = navigationState) {
+  console.error("[recoverFromNavigationError] Problema na navegação:", error);
+
+  // Verificar instruções
+  if (
+    !state.instructions ||
+    !Array.isArray(state.instructions) ||
+    state.instructions.length === 0
+  ) {
+    console.warn(
+      "[recoverFromNavigationError] Instruções inválidas:",
+      state.instructions
+    );
+    return false;
+  }
+
+  console.log("[recoverFromNavigationError] Diagnóstico de instruções:");
+
+  // Verificar cada instrução
+  let hasValidCoordinates = false;
+
+  state.instructions.forEach((instruction, index) => {
+    const coords = normalizeCoordinates(instruction);
+    console.log(`Passo ${index}: ${instruction.original || "Desconhecido"}`);
+    console.log(
+      `  Coords: ${
+        coords
+          ? `Lat: ${coords.latitude}, Lon: ${coords.longitude}`
+          : "INVÁLIDO"
+      }`
+    );
+
+    if (coords) {
+      // Corrigir instruções com coordenadas inválidas
+      instruction.latitude = coords.latitude;
+      instruction.longitude = coords.longitude;
+      hasValidCoordinates = true;
+    }
+  });
+
+  if (!hasValidCoordinates) {
+    console.error(
+      "[recoverFromNavigationError] Não foi possível recuperar - nenhuma coordenada válida"
+    );
+    return false;
+  }
+
+  console.log(
+    "[recoverFromNavigationError] Coordenadas normalizadas, tentando continuar navegação"
+  );
+  return true;
+}
+
+/**
+ * Monitora a aproximação de curvas e fornece feedback apropriado
+ * @param {Object} currentPos - Posição atual do usuário
+ * @param {Object} nextTurn - Dados da próxima curva
+ * @param {number} distance - Distância em metros até a curva
+ */
+export function monitorApproachingTurn(currentPos, nextTurn, distance) {
+  if (!nextTurn || distance === undefined) return;
+
+  try {
+    // Não notificar novamente se já notificou para essa curva
+    const turnId = `${nextTurn.latitude || nextTurn.lat}-${
+      nextTurn.longitude || nextTurn.lon || nextTurn.lng
+    }`;
+
+    // Criar objeto para rastrear notificações se não existir
+    if (!navigationState.notifiedTurns) {
+      navigationState.notifiedTurns = {};
+    }
+
+    // Níveis de aproximação com feedback gradual
+    if (distance < 100 && distance >= 50) {
+      // Primeiro alerta suave
+      if (!navigationState.notifiedTurns[turnId]?.level100) {
+        console.log(
+          `[monitorApproachingTurn] Aproximando-se de curva (${distance.toFixed(
+            0
+          )}m)`
+        );
+
+        // Destacar banner se função disponível
+        if (typeof flashBanner === "function") {
+          flashBanner(true);
+        }
+
+        // Vibrar se disponível
+        if ("vibrate" in navigator) {
+          navigator.vibrate(100);
+        }
+
+        // Marcar como notificado
+        navigationState.notifiedTurns[turnId] = {
+          ...navigationState.notifiedTurns[turnId],
+          level100: true,
+        };
+      }
+    } else if (distance < 50 && distance >= 20) {
+      // Alerta mais intenso
+      if (!navigationState.notifiedTurns[turnId]?.level50) {
+        console.log(
+          `[monitorApproachingTurn] Curva iminente (${distance.toFixed(0)}m)`
+        );
+
+        if ("vibrate" in navigator) {
+          navigator.vibrate([100, 50, 100]);
+        }
+
+        // Anunciar por voz se função disponível
+        if (typeof speak === "function" && !navigationState.isMuted) {
+          const simplifiedInstruction =
+            nextTurn.simplifiedInstruction || "Prepare-se para virar";
+          speak(`Em ${Math.round(distance)} metros, ${simplifiedInstruction}`);
+        }
+
+        navigationState.notifiedTurns[turnId] = {
+          ...navigationState.notifiedTurns[turnId],
+          level50: true,
+          level100: true,
+        };
+      }
+    } else if (distance < 20) {
+      // Alerta de manobra imediata
+      if (!navigationState.notifiedTurns[turnId]?.level20) {
+        console.log(
+          `[monitorApproachingTurn] Execute a manobra agora! (${distance.toFixed(
+            0
+          )}m)`
+        );
+
+        if ("vibrate" in navigator) {
+          navigator.vibrate([200, 100, 200]);
+        }
+
+        if (typeof speak === "function" && !navigationState.isMuted) {
+          const instruction = nextTurn.simplifiedInstruction || "Vire agora";
+          speak(instruction);
+        }
+
+        navigationState.notifiedTurns[turnId] = {
+          ...navigationState.notifiedTurns[turnId],
+          level20: true,
+          level50: true,
+          level100: true,
+        };
+      }
+    } else if (distance > 150) {
+      // Reset notificações quando estiver longe da curva
+      if (navigationState.notifiedTurns[turnId]) {
+        delete navigationState.notifiedTurns[turnId];
+      }
+    }
+  } catch (error) {
+    console.error("[monitorApproachingTurn] Erro:", error);
+  }
 }
 
 // Adicionar função auxiliar para formatação de distância
@@ -1235,7 +2056,7 @@ export async function recalculateRoute(
  * @returns {number} Distância em metros.
  */
 export function calculateDistance(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+  if (!lat1 || !lon1 || !lat2) return Infinity;
 
   const R = 6371e3; // Raio da Terra em metros
   const φ1 = (lat1 * Math.PI) / 180;
@@ -1384,17 +2205,69 @@ export default {
   recalculateRoute,
 };
 
+// Na função setupRealTimeUpdates, adicione uma chamada para updateDirectionalMarker
+
+// Modificação na função setupRealTimeUpdates (por volta da linha 1679)
+
 function setupRealTimeUpdates() {
   // Limpar intervalo existente se houver
-  if (navigationState.updateInterval)
+  if (navigationState.updateInterval) {
     clearInterval(navigationState.updateInterval);
+  }
 
-  // Atualizar métricas a cada 3 segundos
+  // Intervalo para atualização das métricas
   navigationState.updateInterval = setInterval(() => {
-    if (navigationState.isActive && userLocation) {
+    if (!navigationState.isActive) {
+      clearInterval(navigationState.updateInterval);
+      return;
+    }
+
+    if (userLocation) {
+      try {
+        // Obter pontos da rota
+        let routePoints = null;
+
+        // Primeiro, tentar obter de lastRoutePoints (o mais atualizado)
+        if (window.lastRoutePoints && Array.isArray(window.lastRoutePoints)) {
+          routePoints = window.lastRoutePoints;
+        }
+        // Depois, tentar extrair da rota atual
+        else if (
+          window.currentRoute &&
+          typeof window.currentRoute.getLatLngs === "function"
+        ) {
+          routePoints = window.currentRoute.getLatLngs();
+        }
+        // Por último, tentar usar os waypoints de navigationState
+        else if (
+          navigationState.instructions &&
+          navigationState.instructions.length > 0
+        ) {
+          // Extrair coordenadas das instruções
+          routePoints = navigationState.instructions
+            .map((instruction) => ({
+              lat: instruction.latitude || instruction.lat,
+              lng: instruction.longitude || instruction.lon || instruction.lng,
+            }))
+            .filter((point) => point.lat && point.lng);
+        }
+
+        // Se conseguimos obter pontos da rota, atualizar direção
+        if (routePoints && routePoints.length > 0) {
+          // Chamada à função de atualização de direção
+          updateUserMarkerDirection(userLocation, routePoints);
+        }
+      } catch (error) {
+        console.warn(
+          "[setupRealTimeUpdates] Erro ao atualizar direção do marcador:",
+          error
+        );
+      }
+
+      // Continuar com a atualização normal de navegação
       updateRealTimeNavigation(userLocation);
     }
-  }, 3000);
+  }, 5000); // A cada 5 segundos
 
   console.log(
     "[setupRealTimeUpdates] Monitoramento de métricas em tempo real iniciado"
@@ -1440,6 +2313,8 @@ export function rotateMap(angle) {
  * Configura a verificação periódica da integridade do banner e seus elementos
  * Garantindo que todos os elementos visuais estejam funcionando corretamente
  */
+// Substituir a função setupBannerIntegrityCheck
+
 export function setupBannerIntegrityCheck() {
   // Cancelar qualquer verificação existente
   if (window.bannerIntegrityInterval) {
@@ -1449,19 +2324,40 @@ export function setupBannerIntegrityCheck() {
   // Importar as funções necessárias do módulo bannerUI
   import("../navigationUi/bannerUI.js")
     .then((bannerUI) => {
-      // Verificar integridade imediatamente
-      bannerUI.ensureBannerIntegrity();
-
-      // Configurar verificação a cada 5 segundos
-      window.bannerIntegrityInterval = setInterval(() => {
-        if (navigationState.isActive) {
-          bannerUI.ensureBannerIntegrity();
+      try {
+        // Garantir que o banner está no DOM antes da verificação
+        const banner = document.getElementById(UI_CONFIG.IDS.BANNER);
+        if (!banner) {
+          console.warn(
+            "[setupBannerIntegrityCheck] Banner não encontrado no DOM, recriando..."
+          );
+          const newBanner = bannerUI.createNavigationBanner();
+          if (newBanner) {
+            console.log(
+              "[setupBannerIntegrityCheck] Banner recriado com sucesso"
+            );
+          }
         }
-      }, 5000);
 
-      console.log(
-        "[setupBannerIntegrityCheck] Verificação de integridade do banner configurada"
-      );
+        // Verificar integridade imediatamente
+        bannerUI.ensureBannerIntegrity();
+
+        // Configurar verificação a cada 5 segundos
+        window.bannerIntegrityInterval = setInterval(() => {
+          if (navigationState.isActive) {
+            bannerUI.ensureBannerIntegrity();
+          }
+        }, 5000);
+
+        console.log(
+          "[setupBannerIntegrityCheck] Verificação de integridade do banner configurada"
+        );
+      } catch (err) {
+        console.error(
+          "[setupBannerIntegrityCheck] Erro ao verificar integridade do banner:",
+          err
+        );
+      }
     })
     .catch((err) => {
       console.error(
@@ -1491,4 +2387,62 @@ function extractStreetName(instruction) {
   }
 
   return "-";
+}
+
+/**
+ * Normaliza as instruções para garantir formato consistente
+ * @param {Array} instructions - Array de instruções a normalizar
+ * @returns {Array} Instruções normalizadas
+ */
+function normalizeInstructions(instructions) {
+  if (!instructions || !Array.isArray(instructions)) return [];
+
+  return instructions.map((instruction) => {
+    // Criar cópia para não modificar original
+    const normalized = { ...instruction };
+
+    // Garantir coordenadas no formato esperado
+    if (instruction.coordinates && Array.isArray(instruction.coordinates)) {
+      normalized.latitude = instruction.coordinates[0];
+      normalized.longitude = instruction.coordinates[1];
+    } else if (instruction.location && Array.isArray(instruction.location)) {
+      normalized.latitude = instruction.location[0];
+      normalized.longitude = instruction.longitude[1];
+    }
+
+    // Se tem lat/lon/lng, usar esses valores
+    if (instruction.lat !== undefined) {
+      normalized.latitude = instruction.lat;
+    }
+    if (instruction.lon !== undefined || instruction.lng !== undefined) {
+      normalized.longitude = instruction.lon || instruction.lng;
+    }
+
+    // Normalizar outros campos para formato consistente
+    if (instruction.type !== undefined && !normalized.stepType) {
+      normalized.stepType = instruction.type;
+    }
+
+    return normalized;
+  });
+}
+
+// Também criar uma função para limpar todos estados ao finalizar
+export function resetNavigationState() {
+  navigationState.isActive = false;
+  navigationState.isPaused = false;
+  navigationState.currentStepIndex = 0;
+  navigationState.arrivalNotified = false;
+  navigationState.deviationDetected = false;
+  navigationState.instructions = [];
+  navigationState.routeData = null;
+  navigationState.lastProcessedPosition = null;
+  navigationState.lastUpdateTime = null;
+  navigationState.selectedDestination = null;
+
+  // Limpar intervalos e watchers
+  if (navigationState.updateInterval) {
+    clearInterval(navigationState.updateInterval);
+    navigationState.updateInterval = null;
+  }
 }

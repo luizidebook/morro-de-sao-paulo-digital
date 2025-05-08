@@ -1,22 +1,4 @@
 /**
- * Verifica se uma coordenada é válida
- * @param {number} lat - Latitude
- * @param {number} lon - Longitude
- * @returns {boolean} - Verdadeiro se a coordenada for válida
- */
-export function isValidCoordinate(lat, lon) {
-  return (
-    typeof lat === "number" &&
-    typeof lon === "number" &&
-    !isNaN(lat) &&
-    !isNaN(lon) &&
-    lat >= -90 &&
-    lat <= 90 &&
-    lon >= -180 &&
-    lon <= 180
-  );
-}
-/**
  * calculators.js
  *
  * Funções utilitárias para cálculos de navegação
@@ -26,31 +8,71 @@ export function isValidCoordinate(lat, lon) {
 const EARTH_RADIUS = 6371000; // Raio médio da Terra em metros
 
 /**
- * Calcula a distância entre dois pontos usando a fórmula de Haversine
- * @param {number} lat1 - Latitude do ponto 1
- * @param {number} lon1 - Longitude do ponto 1
- * @param {number} lat2 - Latitude do ponto 2
- * @param {number} lon2 - Longitude do ponto 2
- * @returns {number} Distância em metros
+ * Calcula a distância entre dois pontos geográficos usando a fórmula de Haversine
+ * @param {number} lat1 - Latitude do primeiro ponto
+ * @param {number} lon1 - Longitude do primeiro ponto
+ * @param {number} lat2 - Latitude do segundo ponto
+ * @param {number} lon2 - Longitude do segundo ponto
+ * @returns {number} - Distância em metros
  */
 export function calculateDistance(lat1, lon1, lat2, lon2) {
-  // Converter graus para radianos
-  const toRad = (value) => (value * Math.PI) / 180;
+  // Validação de parâmetros
+  if (
+    lat1 === undefined ||
+    lon1 === undefined ||
+    lat2 === undefined ||
+    lon2 === undefined ||
+    isNaN(lat1) ||
+    isNaN(lon1) ||
+    isNaN(lat2) ||
+    isNaN(lon2)
+  ) {
+    console.error("[calculateDistance] Parâmetros inválidos:", {
+      lat1,
+      lon1,
+      lat2,
+      lon2,
+    });
+    return 0;
+  }
 
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
+  // Converter strings para números
+  lat1 = parseFloat(lat1);
+  lon1 = parseFloat(lon1);
+  lat2 = parseFloat(lat2);
+  lon2 = parseFloat(lon2);
+
+  const R = 6371000; // Raio da Terra em metros
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
 
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = EARTH_RADIUS * c;
+  const distance = R * c;
 
   return distance;
+}
+
+/**
+ * Verifica se uma coordenada geográfica é válida
+ * @param {number} lat - Latitude
+ * @param {number} lon - Longitude
+ * @returns {boolean} - true se for válida, false caso contrário
+ */
+export function isValidCoordinate(lat, lon) {
+  // Validar se são números
+  if (isNaN(parseFloat(lat)) || isNaN(parseFloat(lon))) return false;
+
+  // Validar se estão dentro dos limites válidos
+  const latNum = parseFloat(lat);
+  const lonNum = parseFloat(lon);
+
+  return latNum >= -90 && latNum <= 90 && lonNum >= -180 && lonNum <= 180;
 }
 
 /**

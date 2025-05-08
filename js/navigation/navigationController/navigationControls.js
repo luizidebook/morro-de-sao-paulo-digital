@@ -1033,30 +1033,6 @@ function showToast(message, duration = 3000) {
 }
 
 /**
- * Adiciona feedback tátil para ações importantes
- * @param {string} intensity - Intensidade da vibração: 'light', 'medium' ou 'strong'
- */
-function provideTactileFeedback(intensity = "medium") {
-  // Verificar se o usuário desabilitou feedback tátil
-  if (navigationState.disableTactileFeedback) return;
-
-  // Verificar suporte à API de vibração
-  if ("vibrate" in navigator) {
-    switch (intensity) {
-      case "light":
-        navigator.vibrate(10);
-        break;
-      case "medium":
-        navigator.vibrate(40);
-        break;
-      case "strong":
-        navigator.vibrate([30, 50, 30]);
-        break;
-    }
-  }
-}
-
-/**
  * Atualiza o estado do botão de minimizar visualmente
  * @param {boolean} minimized - Se está minimizado
  */
@@ -1089,59 +1065,50 @@ export function adjustMapZoomBasedOnSpeed(speed) {
   map.setZoom(zoomLevel);
 }
 
-// Remover funções conflitantes e substituir por esta implementação unificada
+/**
+ * Define a rotação do mapa e ajusta os elementos para manter orientação correta
+ * @param {number} heading - Ângulo de rotação em graus
+ */
 export function setMapRotation(heading) {
-  // Validar parâmetros e estado
+  // Validações
   if (!map || !navigationState.isActive || !navigationState.isRotationEnabled) {
     return;
   }
 
-  // Proteção contra valores nulos
   const angle = heading !== null && heading !== undefined ? heading : 0;
 
-  // Limitar frequência de atualização
-  const now = Date.now();
-  if (now - navigationState.lastRotationTime < 100) {
-    return;
-  }
-  navigationState.lastRotationTime = now;
-
-  console.log(`[setMapRotation] Rotacionando mapa: ${angle}°`);
-
   try {
-    // Verificar se o mapa tem a função setBearing (do plugin leaflet.rotateMap)
+    // Se o plugin oficial está disponível
     if (typeof map.setBearing === "function") {
-      // Usar o plugin oficial
       map.setBearing(angle);
-    } else {
-      // Implementação alternativa quando o plugin não está disponível
-      const mapContainer = map.getContainer();
-      const tilePane = mapContainer.querySelector(".leaflet-tile-pane");
+    }
+    // Implementação manual
+    else {
+      const tilePane = document.querySelector(".leaflet-tile-pane");
+      const controlPane = document.querySelector(".leaflet-control-container");
+      const rotationAngle = angle;
 
       if (tilePane) {
-        // Rotacionar tiles manualmente (180° - angle para visão de primeira pessoa)
-        const rotationAngle = 180 - angle;
-
-        // Adicionar classe para CSS
-        document.body.classList.add("map-rotation-active");
-
-        // Rotacionar apenas o painel de tiles
+        tilePane.style.transition = "transform 0.3s ease-out";
         tilePane.style.transform = `rotate(${rotationAngle}deg)`;
         tilePane.style.transformOrigin = "center center";
-
-        // Definir variáveis CSS
-        document.documentElement.style.setProperty(
-          "--map-rotation",
-          `${rotationAngle}deg`
-        );
-        document.documentElement.style.setProperty(
-          "--map-rotation-inverse",
-          `-${rotationAngle}deg`
-        );
       }
 
-      // Rotacionar marcadores individualmente
-      adjustMapMarkers(angle);
+      // Manter controles sempre na orientação normal
+      if (controlPane) {
+        controlPane.style.transition = "transform 0.3s ease-out";
+        controlPane.style.transform = `rotate(${-rotationAngle}deg)`;
+      }
+
+      // Definir variáveis CSS para contra-rotação
+      document.documentElement.style.setProperty(
+        "--map-rotation",
+        `${angle}deg`
+      );
+      document.documentElement.style.setProperty(
+        "--map-rotation-inverse",
+        `${-angle}deg`
+      );
     }
 
     // Atualizar estado
@@ -1169,27 +1136,173 @@ export function resetMapRotation() {
   }
 }
 
-function monitorApproachingTurn(
-  currentPosition,
-  nextTurnCoordinates,
-  distance
-) {
-  // Se estiver se aproximando de uma curva (menos de 100m)
-  if (distance < 100) {
-    // Fornecer alerta visual
-    const banner = document.getElementById(UI_CONFIG.IDS.BANNER);
-    if (banner) {
-      banner.classList.add("approaching-turn");
+// Adicionar função de monitoramento de aproximação de curvas
+
+/**
+ * Monitora a aproximação de curvas e fornece feedback apropriado
+ * @param {Object} currentPos - Posição atual do usuário
+ * @param {Object} nextTurn - Dados da próxima curva
+ * @param {number} distance - Distância em metros até a curva
+ */
+export function monitorApproachingTurn(currentPos, nextTurn, distance) {
+  if (!nextTurn || distance === undefined) return;
+
+  try {
+    // Não notificar novamente se já notificou para essa curva
+    const turnId = `${nextTurn.latitude || nextTurn.lat}-${
+      nextTurn.longitude || nextTurn.lon || nextTurn.lng
+    }`;
+
+    // Criar objeto para rastrear notificações se não existir
+    if (!navigationState.notifiedTurns) {
+      navigationState.notifiedTurns = {};
     }
 
-    // Feedback tátil e sonoro...
-  } else {
-    // Remover alerta se estiver longe da curva
-    const banner = document.getElementById(UI_CONFIG.IDS.BANNER);
-    if (banner) {
-      banner.classList.remove("approaching-turn");
+    // Níveis de aproximação com feedback gradual
+    if (distance < 100 && distance >= 50) {
+      // Primeiro alerta suave
+      if (!navigationState.notifiedTurns[turnId]?.level100) {
+        console.log(
+          `[monitorApproachingTurn] Aproximando-se de curva (${distance.toFixed(
+            0
+          )}m)`
+        );
+
+        // Destacar banner se função disponível
+        if (typeof highlightBanner === "function") {
+          highlightBanner("approaching");
+        }
+
+        // Vibrar se disponível
+        if ("vibrate" in navigator) {
+          navigator.vibrate(100);
+        }
+
+        // Marcar como notificado
+        navigationState.notifiedTurns[turnId] = {
+          ...navigationState.notifiedTurns[turnId],
+          level100: true,
+        };
+      }
+    } else if (distance < 50 && distance >= 20) {
+      // Alerta mais intenso
+      if (!navigationState.notifiedTurns[turnId]?.level50) {
+        console.log(
+          `[monitorApproachingTurn] Curva iminente (${distance.toFixed(0)}m)`
+        );
+
+        if (typeof highlightBanner === "function") {
+          highlightBanner("imminent");
+        }
+
+        if ("vibrate" in navigator) {
+          navigator.vibrate([100, 50, 100]);
+        }
+
+        // Anunciar por voz se função disponível
+        if (typeof speak === "function") {
+          const simplifiedInstruction =
+            nextTurn.simplifiedInstruction || "Prepare-se para virar";
+          speak(`Em ${Math.round(distance)} metros, ${simplifiedInstruction}`);
+        }
+
+        navigationState.notifiedTurns[turnId] = {
+          ...navigationState.notifiedTurns[turnId],
+          level50: true,
+          level100: true,
+        };
+      }
+    } else if (distance < 20) {
+      // Alerta de manobra imediata
+      if (!navigationState.notifiedTurns[turnId]?.level20) {
+        console.log(
+          `[monitorApproachingTurn] Execute a manobra agora! (${distance.toFixed(
+            0
+          )}m)`
+        );
+
+        if (typeof highlightBanner === "function") {
+          highlightBanner("now");
+        }
+
+        if ("vibrate" in navigator) {
+          navigator.vibrate([200, 100, 200]);
+        }
+
+        if (typeof speak === "function") {
+          const instruction = nextTurn.simplifiedInstruction || "Vire agora";
+          speak(instruction);
+        }
+
+        navigationState.notifiedTurns[turnId] = {
+          ...navigationState.notifiedTurns[turnId],
+          level20: true,
+          level50: true,
+          level100: true,
+        };
+      }
     }
-    window.turnAnnounced = false;
+  } catch (error) {
+    console.error("[monitorApproachingTurn] Erro:", error);
+  }
+}
+
+/**
+ * Destaca o banner de navegação com diferentes estilos
+ * @param {string} level - Nível de destaque: "approaching", "imminent" ou "now"
+ */
+function highlightBanner(level = "approaching") {
+  const banner = document.getElementById("instruction-banner");
+  if (!banner) return;
+
+  // Remover classes anteriores
+  banner.classList.remove(
+    "highlight-approaching",
+    "highlight-imminent",
+    "highlight-now"
+  );
+
+  // Adicionar classe específica
+  banner.classList.add(`highlight-${level}`);
+
+  // Remover classe após efeito
+  setTimeout(() => {
+    banner.classList.remove(`highlight-${level}`);
+  }, 3000);
+}
+
+/**
+ * Fornece feedback tátil (vibração) se disponível
+ * @param {string} intensity - Intensidade da vibração: "light", "medium" ou "strong"
+ */
+function provideTactileFeedback(intensity = "medium") {
+  // Verificar se a API de vibração está disponível
+  if (!("vibrate" in navigator)) {
+    return;
+  }
+
+  try {
+    // Definir padrões de vibração baseados na intensidade
+    let pattern;
+
+    switch (intensity) {
+      case "light":
+        pattern = [100];
+        break;
+      case "medium":
+        pattern = [100, 50, 100];
+        break;
+      case "strong":
+        pattern = [200, 100, 200, 100, 200];
+        break;
+      default:
+        pattern = [100];
+    }
+
+    // Vibrar com o padrão definido
+    navigator.vibrate(pattern);
+  } catch (error) {
+    console.warn("[provideTactileFeedback] Erro ao vibrar:", error);
   }
 }
 

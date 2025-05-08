@@ -27,10 +27,8 @@ export function bannerExists() {
   return banner && !banner.classList.contains(UI_CONFIG.CLASSES.HIDDEN);
 }
 
-/**
- * Cria o banner de instrução para navegação
- * @returns {HTMLElement} - Elemento do banner
- */
+// Na função createNavigationBanner, substituir a estrutura HTML do banner
+
 export function createNavigationBanner() {
   const bannerId = UI_CONFIG.IDS.BANNER;
   let banner = document.getElementById(bannerId);
@@ -45,7 +43,7 @@ export function createNavigationBanner() {
   banner.id = bannerId;
   banner.className = "instruction-banner";
 
-  // Estrutura HTML completa com IDs corretos
+  // Estrutura HTML completa com IDs corretos e progresso
   banner.innerHTML = `
     <div class="instruction-primary">
       <span id="${UI_CONFIG.IDS.INSTRUCTION_ARROW}" class="instruction-icon">↑</span>
@@ -58,8 +56,9 @@ export function createNavigationBanner() {
     <div class="instruction-secondary">
       <p id="${UI_CONFIG.IDS.INSTRUCTION_DETAILS}" class="instruction-details">Siga em frente por 100m</p>
       <div class="progress-container">
-        <div class="progress-indicator-fill" style="width: 0%"></div>
+        <div id="route-progress" class="progress-indicator-fill" style="width: 0%"></div>
       </div>
+      <div id="progress-text" style="text-align: center; font-size: 0.8em; margin: 4px 0;">0%</div>
       <div class="metrics-group">
         <div class="metric">
           <span class="metric-label">Distância</span>
@@ -78,28 +77,6 @@ export function createNavigationBanner() {
 
   // Adicionar estilos necessários
   addBannerStyles();
-
-  // Debug: verificar se todos os elementos foram criados
-  const elements = [
-    UI_CONFIG.IDS.INSTRUCTION_ARROW,
-    UI_CONFIG.IDS.INSTRUCTION_MAIN,
-    UI_CONFIG.IDS.INSTRUCTION_DETAILS,
-    UI_CONFIG.IDS.INSTRUCTION_DISTANCE,
-    UI_CONFIG.IDS.INSTRUCTION_TIME,
-    UI_CONFIG.IDS.MINIMIZE_BUTTON,
-  ];
-
-  const missingElements = elements.filter((id) => !document.getElementById(id));
-  if (missingElements.length > 0) {
-    console.error(
-      "[createNavigationBanner] Elementos não encontrados após criação:",
-      missingElements
-    );
-  } else {
-    console.log(
-      "[createNavigationBanner] Banner criado com sucesso, todos os elementos presentes"
-    );
-  }
 
   return banner;
 }

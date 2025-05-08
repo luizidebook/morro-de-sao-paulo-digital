@@ -72,7 +72,97 @@ export function setLastRouteData(routeData) {
 export function getLastRouteData() {
   return lastRouteData;
 }
+// No processamento da rota, garantir uma estrutura consistente
+async function processRouteData(routeData) {
+  if (!routeData || !routeData.features || routeData.features.length === 0) {
+    console.error("[processRouteData] Dados de rota inválidos");
+    return null;
+  }
 
+  try {
+    // Extrair primeiro feature que contém a rota
+    const routeFeature = routeData.features[0];
+    const routeGeometry = routeFeature?.geometry;
+    const routeProperties = routeFeature?.properties;
+
+    if (!routeGeometry || !routeProperties) {
+      console.error("[processRouteData] Geometria ou propriedades ausentes");
+      return null;
+    }
+
+    // Extrair segmentos e passos
+    const segments = routeProperties.segments || [];
+    if (segments.length === 0) {
+      console.warn("[processRouteData] Sem segmentos na rota");
+      return null;
+    }
+
+    const rawSteps = segments[0]?.steps || [];
+    if (rawSteps.length === 0) {
+      console.warn("[processRouteData] Sem passos no primeiro segmento");
+      return null;
+    }
+
+    // Normalizar os passos para formato consistente
+    const processedSteps = rawSteps.map((step, index) => {
+      // Extrair coordenadas do passo
+      let stepLat, stepLon;
+
+      // Extrair do way_points, se existir
+      if (
+        step.way_points &&
+        Array.isArray(step.way_points) &&
+        step.way_points.length >= 2
+      ) {
+        const wayPointIndex = step.way_points[0]; // Início do segmento
+        const coordinates = routeGeometry.coordinates?.[wayPointIndex];
+
+        if (
+          coordinates &&
+          Array.isArray(coordinates) &&
+          coordinates.length >= 2
+        ) {
+          // Coordenadas em GeoJSON são [lon, lat]
+          stepLon = coordinates[0];
+          stepLat = coordinates[1];
+        }
+      }
+
+      // Objeto normalizado
+      return {
+        original: step.instruction,
+        instruction: step.instruction,
+        distance: step.distance,
+        duration: step.duration,
+        type: step.type,
+        name: step.name || "",
+
+        // Coordenadas normalizadas
+        lat: stepLat,
+        lon: stepLon,
+        latitude: stepLat,
+        longitude: stepLon,
+
+        // Métodos são adicionados na etapa de processamento
+        formattedDistance: formatDistance(step.distance),
+        formattedTime: formatDuration(step.duration),
+
+        // Índice para referência
+        index,
+        isLastStep: index === rawSteps.length - 1,
+      };
+    });
+
+    return {
+      steps: processedSteps,
+      totalDistance: routeProperties.summary?.distance || 0,
+      totalDuration: routeProperties.summary?.duration || 0,
+    };
+  } catch (error) {
+    console.error("[processRouteData] Erro ao processar dados:", error);
+    return null;
+  }
+}
 /**
  * Processa as instruções de uma rota, traduzindo e formatando dados para exibição
  * @param {Object|Array} route - Dados da rota da API ou array de steps

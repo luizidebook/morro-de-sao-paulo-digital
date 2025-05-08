@@ -1,158 +1,92 @@
-/**
- * leaflet.rotateMap.js
- * Plugin para rotação de mapas Leaflet com suporte a contra-rotação de elementos
- */
 (function () {
-  // Verificar se o Leaflet está carregado
+  // Verificar se o Leaflet está disponível
   if (typeof L === "undefined") {
-    console.error("Leaflet deve ser carregado antes deste plugin");
+    console.error("Leaflet deve estar carregado antes deste plugin.");
     return;
   }
 
-  console.log("[leaflet.rotateMap] Plugin inicializado com sucesso");
+  // Extender o objeto L.Marker para adicionar suporte à rotação
+  L.Marker.prototype.options.rotationOrigin = "center center";
+  L.Marker.prototype.options.rotationAngle = 0;
 
-  // Adicionar método de rotação ao mapa - CORRIGIDO para evitar recursão
-  L.Map.include({
-    // Propriedade para armazenar o ângulo atual
-    _bearing: 0,
+  // Método para definir o ângulo de rotação
+  L.Marker.prototype.setRotationAngle = function (angle) {
+    this.options.rotationAngle = angle;
 
-    // Método para obter o ângulo atual
-    getBearing: function () {
-      return this._bearing;
-    },
+    // Atualizar o marcador imediatamente se ele estiver no mapa
+    if (this._icon) {
+      this._updateIconStyle(this._icon, this.options);
 
-    // Método para definir o ângulo de rotação
-    setBearing: function (angle) {
-      // Armazenar o ângulo
-      this._bearing = angle;
-
-      // Normalizar o ângulo entre 0-360
-      const normalizedAngle = ((angle % 360) + 360) % 360;
-
-      // Aplicar rotação ao contêiner do mapa
-      const mapContainer = this.getContainer();
-      if (mapContainer) {
-        mapContainer.style.transform = `rotate(${normalizedAngle}deg)`;
-
-        // Adicionar classe para estilização
-        mapContainer.classList.add("leaflet-map-rotated");
-
-        // Definir variáveis CSS para uso em contra-rotações
-        document.documentElement.style.setProperty(
-          "--map-bearing",
-          `${normalizedAngle}deg`
-        );
-        document.documentElement.style.setProperty(
-          "--bearing-inverse",
-          `-${normalizedAngle}deg`
-        );
-        document.documentElement.style.setProperty(
-          "--bearing-value",
-          `${normalizedAngle}`
-        );
-
-        // Disparar evento de rotação para outros componentes reagirem
-        this.fire("rotate", { bearing: normalizedAngle });
-      }
-
-      return this;
-    },
-
-    // Método para resetar a rotação
-    resetBearing: function () {
-      return this.setBearing(0);
-    },
-  });
-
-  // Adicionar controle de rotação
-  L.Control.Rotate = L.Control.extend({
-    options: {
-      position: "topright",
-      autoHide: false,
-    },
-
-    onAdd: function (map) {
-      const container = L.DomUtil.create(
-        "div",
-        "leaflet-control-rotate leaflet-bar"
+      // Log para debug
+      console.log(
+        `[leaflet.rotatedMarker] Aplicando rotação de ${angle.toFixed(
+          1
+        )}° ao marcador`
       );
-      const button = L.DomUtil.create(
-        "a",
-        "leaflet-control-rotate-button",
-        container
-      );
-
-      button.innerHTML = "⤿";
-      button.href = "#";
-      button.title = "Resetar rotação";
-
-      L.DomEvent.on(button, "click", L.DomEvent.stopPropagation)
-        .on(button, "click", L.DomEvent.preventDefault)
-        .on(button, "click", function () {
-          map.resetBearing();
-        });
-
-      this._map = map;
-
-      // Mostrar/esconder o botão conforme a rotação
-      if (this.options.autoHide) {
-        this._map.on("rotate", function (e) {
-          container.style.display = e.bearing === 0 ? "none" : "block";
-        });
-        container.style.display = "none";
-      }
-
-      return container;
-    },
-  });
-
-  // Criar função factory para o controle de rotação
-  L.control.rotate = function (options) {
-    return new L.Control.Rotate(options);
+    }
+    return this;
   };
 
-  // Adicionar CSS necessário
-  function addRotationStyles() {
-    if (document.getElementById("leaflet-rotate-style")) return;
+  // Método para definir a origem da rotação
+  L.Marker.prototype.setRotationOrigin = function (origin) {
+    this.options.rotationOrigin = origin;
 
-    const styleElem = document.createElement("style");
-    styleElem.id = "leaflet-rotate-style";
-    styleElem.textContent = `
-      .leaflet-rotate-enabled {
-        transition: transform 0.3s ease-out;
-        transform-origin: center center !important;
-        backface-visibility: hidden;
-        perspective: 1000px;
-      }
-      
-      /* CORREÇÃO: Contra-rotacionar todos os elementos do painel de controle */
-      .leaflet-map-rotated .leaflet-control-container .leaflet-top,
-      .leaflet-map-rotated .leaflet-control-container .leaflet-bottom,
-      .leaflet-map-rotated .leaflet-control,
-      .leaflet-map-rotated .leaflet-control-scale,
-      .leaflet-map-rotated .leaflet-control-attribution {
-        transform: rotate(var(--bearing-inverse)) !important;
-        transform-origin: center center;
-      }
-      
-      /* CORREÇÃO: Assegurar que textos não fiquem de cabeça para baixo */
-      .leaflet-map-rotated .leaflet-marker-icon:not(.user-location-marker),
-      .leaflet-map-rotated .leaflet-popup,
-      .leaflet-map-rotated .leaflet-tooltip {
-        transform: rotate(var(--bearing-inverse)) !important;
-      }
-      
-      /* CORREÇÃO: Manter o popup alinhado */
-      .leaflet-map-rotated .leaflet-popup-tip-container {
-        transform: rotate(var(--bearing-inverse)) !important;
-      }
-    `;
+    // Atualizar o marcador imediatamente se ele estiver no mapa
+    if (this._icon) {
+      this._updateIconStyle(this._icon);
+    }
+    return this;
+  };
 
-    document.head.appendChild(styleElem);
-  }
+  // Extender _initIcon para garantir que o ícone seja devidamente inicializado com rotação
+  const originalInitIcon = L.Marker.prototype._initIcon;
+  L.Marker.prototype._initIcon = function () {
+    originalInitIcon.call(this);
 
-  // Adicionar estilos quando o plugin é carregado
-  addRotationStyles();
+    // Aplicar rotação após inicialização do ícone
+    this._updateIconStyle(this._icon, this.options);
+  };
 
-  console.log("[leaflet.rotateMap] Plugin inicializado com sucesso");
+  // Extender _setPos para manter a rotação durante reposicionamentos
+  const originalSetPos = L.Marker.prototype._setPos;
+  L.Marker.prototype._setPos = function (pos) {
+    originalSetPos.call(this, pos);
+
+    // Reaplicar rotação após reposicionamento
+    this._updateIconStyle(this._icon, this.options);
+  };
+
+  // Método auxiliar para aplicar estilos de rotação
+  L.Marker.prototype._updateIconStyle = function (icon, options) {
+    if (!icon || !options) return;
+
+    const angle = options.rotationAngle || 0;
+    const origin = options.rotationOrigin || "center center";
+
+    // Adicionar estilo de rotação
+    icon.style.transformOrigin = origin;
+
+    // Verificar se já existe um transform e adicionar rotação
+    let transform = "";
+    const existingTransform = icon.style.transform || "";
+
+    // Remover qualquer rotação existente do transform atual
+    if (existingTransform.includes("rotate")) {
+      transform = existingTransform.replace(/rotate\([^)]+\)/g, "");
+    } else {
+      transform = existingTransform;
+    }
+
+    // Adicionar a nova rotação
+    transform = transform.trim() + ` rotate(${angle}deg)`;
+    icon.style.transform = transform;
+
+    // Suporte para navegadores que exigem prefixos
+    icon.style.webkitTransform = transform;
+    icon.style.MozTransform = transform;
+    icon.style.msTransform = transform;
+    icon.style.OTransform = transform;
+  };
+
+  console.log("[leaflet.rotatedMarker] Plugin inicializado com sucesso");
 })();

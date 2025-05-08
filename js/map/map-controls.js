@@ -1360,6 +1360,9 @@ export async function plotRouteOnMap(
     }
 
     // Cria e adiciona a polyline ao mapa com estilo melhorado
+    // Modificação na função plotRouteOnMap (por volta da linha 1425)
+
+    // Adicionar APÓS criar a polyline da rota:
     window.currentRoute = L.polyline(latLngs, {
       color: "#3b82f6",
       weight: 5,
@@ -1372,9 +1375,22 @@ export async function plotRouteOnMap(
     // Armazena pontos da rota para uso no sistema de navegação
     window.lastRoutePoints = latLngs;
 
-    // ADICIONAR ESTA PARTE: Encontrar o próximo ponto da rota e apontar o marcador
-    updateUserMarkerDirection(userLocation, latLngs);
+    // ADICIONAR: Chamar a função para orientar o marcador explicitamente
+    if (userLocation && latLngs.length > 0) {
+      // Forçar atualização de orientação para o próximo ponto
+      updateUserMarkerDirection(
+        {
+          latitude: userLocation.latitude || startLat,
+          longitude: userLocation.longitude || startLon,
+          accuracy: userLocation.accuracy || 15,
+        },
+        latLngs
+      );
 
+      console.log(
+        "[plotRouteOnMap] Orientação do marcador atualizada para o próximo ponto"
+      );
+    }
     // Importar a função getMarkerIconForLocation
     try {
       const markerModule = await import("./map-markers.js");
@@ -2089,96 +2105,120 @@ export function getPreciseLocationRealtime(
  * @param {Array} routePoints - Pontos da rota
  */
 export function updateUserMarkerDirection(userPos, routePoints) {
-  // Verificar se temos os dados necessários
-  if (!userPos || !routePoints || !routePoints.length) {
-    console.warn(
-      "[updateUserMarkerDirection] Dados insuficientes para atualizar direção"
-    );
+  // Verificações de validade robustas
+  if (!userPos || !userPos.latitude || !userPos.longitude) {
+    console.warn("[updateUserMarkerDirection] Posição do usuário inválida");
+    return;
+  }
+
+  if (!routePoints || !Array.isArray(routePoints) || routePoints.length < 2) {
+    console.warn("[updateUserMarkerDirection] Pontos de rota inválidos");
     return;
   }
 
   try {
-    // Importar funções necessárias do módulo de localização do usuário
-    import("../navigation/navigationUserLocation/user-location.js")
-      .then((userLocationModule) => {
-        // Encontrar o próximo ponto relevante na rota
-        const nextPoint = findNextRoutePoint(routePoints, userPos, 30);
+    // Encontrar o ponto mais próximo na rota
+    let nearestPointIndex = 0;
+    let minDistance = Infinity;
 
-        if (!nextPoint) {
-          console.warn(
-            "[updateUserMarkerDirection] Não foi possível encontrar próximo ponto da rota"
-          );
-          return;
+    for (let i = 0; i < routePoints.length; i++) {
+      const point = routePoints[i];
+      // Garantir que o ponto está no formato correto [lat, lon]
+      const lat = Array.isArray(point) ? point[0] : point.lat;
+      const lon = Array.isArray(point) ? point[1] : point.lng || point.lon;
+
+      if (lat !== undefined && lon !== undefined) {
+        const distance = calculateDistance(
+          userPos.latitude,
+          userPos.longitude,
+          lat,
+          lon
+        );
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestPointIndex = i;
         }
+      }
+    }
 
-        // Calcular o ângulo para o próximo ponto
-        const nextLat = nextPoint.lat || nextPoint[0];
-        const nextLon = nextPoint.lon || nextPoint.lng || nextPoint[1];
+    // Encontrar o próximo ponto na rota (pelo menos 10m à frente)
+    let nextPointIndex = nearestPointIndex;
+    let nextPoint = null;
 
-        // Garantir que temos coordenadas válidas
-        if (!nextLat || !nextLon) {
-          console.warn(
-            "[updateUserMarkerDirection] Próximo ponto com coordenadas inválidas"
-          );
-          return;
+    // Procurar um ponto à frente que seja significativo (>10m de distância)
+    for (
+      let i = nearestPointIndex + 1;
+      i < routePoints.length && i < nearestPointIndex + 20;
+      i++
+    ) {
+      const point = routePoints[i];
+      const lat = Array.isArray(point) ? point[0] : point.lat;
+      const lon = Array.isArray(point) ? point[1] : point.lng || point.lon;
+
+      if (lat !== undefined && lon !== undefined) {
+        const distanceToPoint = calculateDistance(
+          userPos.latitude,
+          userPos.longitude,
+          lat,
+          lon
+        );
+
+        // Se o ponto está a mais de 10m de distância, usar como ponto de destino
+        if (distanceToPoint > 10) {
+          nextPointIndex = i;
+          nextPoint = { lat, lon };
+          break;
         }
+      }
+    }
 
-        // Calcular o bearing (ângulo) entre a posição atual e o próximo ponto
-        const bearing = userLocationModule.calculateBearing(
-          userPos.latitude || userPos.lat,
-          userPos.longitude || userPos.lon || userPos.lng,
-          nextLat,
-          nextLon
-        );
+    // Se não encontrou um ponto adequado, usar o próximo da sequência
+    if (!nextPoint && nextPointIndex + 1 < routePoints.length) {
+      const point = routePoints[nextPointIndex + 1];
+      const lat = Array.isArray(point) ? point[0] : point.lat;
+      const lon = Array.isArray(point) ? point[1] : point.lng || point.lon;
 
-        // Atualizar o marcador com o ângulo calculado
-        userLocationModule.updateUserMarker(
-          userPos.latitude || userPos.lat,
-          userPos.longitude || userPos.lon || userPos.lng,
-          bearing,
-          userPos.accuracy || 15
-        );
+      if (lat !== undefined && lon !== undefined) {
+        nextPoint = { lat, lon };
+      }
+    }
 
-        console.log(
-          "[updateUserMarkerDirection] Marcador apontando para o próximo ponto da rota:",
-          bearing.toFixed(1) + "°"
-        );
+    // Se temos um próximo ponto, calcular o ângulo e atualizar o marcador
+    if (nextPoint) {
+      const bearing = calculateBearing(
+        userPos.latitude,
+        userPos.longitude,
+        nextPoint.lat,
+        nextPoint.lon
+      );
 
-        // Armazenar o ângulo atual para uso em outras partes do sistema
-        window.currentUserBearing = bearing;
-
-        // Se estivermos em navegação ativa e a rotação estiver habilitada, rotacionar o mapa
-        if (
-          window.navigationState &&
-          window.navigationState.isActive &&
-          window.navigationState.isRotationEnabled
-        ) {
-          // Importar função para rotacionar mapa, se necessário
-          import("../navigation/navigationController/navigationControls.js")
-            .then((module) => {
-              if (typeof module.setMapRotation === "function") {
-                module.setMapRotation(bearing);
-              }
-            })
-            .catch((err) =>
-              console.warn(
-                "[updateUserMarkerDirection] Erro ao importar controles de navegação:",
-                err
-              )
-            );
+      console.log(
+        `[updateUserMarkerDirection] Marcador apontando para o próximo ponto da rota: ${bearing.toFixed(
+          1
+        )}°`,
+        {
+          de: [userPos.latitude, userPos.longitude],
+          para: [nextPoint.lat, nextPoint.lon],
         }
-      })
-      .catch((error) => {
-        console.error(
-          "[updateUserMarkerDirection] Erro ao importar módulo:",
-          error
-        );
-      });
+      );
+
+      // Atualizar o marcador do usuário com o ângulo calculado
+      updateUserMarker(
+        userPos.latitude,
+        userPos.longitude,
+        bearing, // Usar o ângulo calculado, não o heading do dispositivo
+        userPos.accuracy || 15
+      );
+
+      return bearing;
+    } else {
+      console.warn(
+        "[updateUserMarkerDirection] Não foi possível encontrar próximo ponto válido na rota"
+      );
+    }
   } catch (error) {
-    console.warn(
-      "[updateUserMarkerDirection] Erro ao atualizar direção do marcador:",
-      error
-    );
+    console.error("[updateUserMarkerDirection] Erro:", error);
   }
 }
 

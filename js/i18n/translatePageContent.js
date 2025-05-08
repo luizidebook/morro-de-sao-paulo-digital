@@ -158,11 +158,21 @@ function updateAssistantSettings(lang) {
 
   // Labels para as configurações
   const configLabels = {
-    "language-select": "settings_language",
-    "voice-select": "settings_voice",
-    "voice-speed": "settings_voice_speed",
-    "voice-enabled-toggle": "settings_voice_enabled",
-    "theme-select": "settings_theme",
+    language_select: "settings_language",
+    voice_select: "settings_voice",
+    voice_speed: "settings_voice_speed",
+    voice_enabled_toggle: "settings_voice_enabled",
+    theme_select: "settings_theme",
+    settings_title: "Configurações",
+    settings_close: "Fechar",
+    settings_language: "Idioma",
+    settings_voice: "Voz",
+    settings_voice_speed: "Velocidade da voz",
+    settings_voice_enabled: "Voz ativada",
+    settings_theme: "Tema",
+    settings_theme_light: "Claro",
+    settings_theme_dark: "Escuro",
+    settings_theme_auto: "Automático",
   };
 
   for (const [id, key] of Object.entries(configLabels)) {
@@ -209,29 +219,148 @@ function updateAssistantSettings(lang) {
 }
 
 /**
- * Obtém um texto traduzido com base na chave e no idioma
- * @param {string} key - Chave de tradução
- * @param {string} lang - Código do idioma (opcional)
+ * Obter texto geral para o idioma atual
+ * @param {string} key - Chave da tradução
+ * @param {string} [lang] - Código do idioma (opcional, usa o atual se omitido)
  * @returns {string} - Texto traduzido ou chave original se não encontrado
  */
-export function getGeneralText(key, language = selectedLanguage) {
-  // Possível problema: selectedLanguage pode ser objeto quando deveria ser string
-  if (typeof language === "object") {
-    language = language.code || language.language || "pt";
-  }
+export function getGeneralText(key, lang = null) {
+  // Usar idioma fornecido ou o atual
+  const currentLang = lang || getCurrentLanguage();
 
-  // Possível problema: neste ponto, translations[language] pode estar vazio
-  if (!translations[language] || !translations[language][key]) {
+  try {
+    const translations = getTranslations(currentLang);
+
+    if (translations && translations[key]) {
+      return translations[key];
+    }
+
+    // Tentar buscar em inglês como fallback
+    if (currentLang !== "en") {
+      const enTranslations = getTranslations("en");
+      if (enTranslations && enTranslations[key]) {
+        return enTranslations[key];
+      }
+    }
+
     console.warn(
-      `[getGeneralText] Tradução ausente para: '${key}' em '${language}'`
+      `[getGeneralText] Tradução ausente para: '${key}' em '${currentLang}'`
     );
-    // Tentativa com fallback para inglês
-    return translations["en"] && translations["en"][key]
-      ? translations["en"][key]
-      : key;
+    return key;
+  } catch (error) {
+    console.error(
+      `[getGeneralText] Erro ao obter tradução para: ${key}`,
+      error
+    );
+    return key;
+  }
+}
+
+/**
+ * Obter o idioma atual da aplicação
+ * @returns {string} - Código do idioma
+ */
+export function getCurrentLanguage() {
+  // Verificar localStorage primeiro
+  const storedLang = localStorage.getItem("app-language");
+  if (storedLang) return storedLang;
+
+  // Verificar objeto de configuração global
+  if (window.appConfig && window.appConfig.language) {
+    return window.appConfig.language;
   }
 
-  return translations[language][key];
+  // Verificar atributo lang do HTML
+  const htmlLang = document.documentElement.lang;
+  if (htmlLang) return htmlLang;
+
+  // Usar idioma do navegador como fallback
+  return navigator.language.split("-")[0] || "en";
+}
+
+/**
+ * Obtém as traduções para um idioma específico
+ * @param {string} lang - Código do idioma
+ * @returns {Object} - Objeto com as traduções
+ */
+function getTranslations(lang) {
+  // 1. Verificar cache do objeto global translationsCache
+  if (window.translationsCache && window.translationsCache[lang]) {
+    return window.translationsCache[lang];
+  }
+
+  // 2. Verificar se as traduções já foram carregadas pelo sistema de módulos
+  if (loadedTranslations && loadedTranslations[lang]) {
+    // Se disponível no objeto de módulo, armazenar no cache global também
+    if (!window.translationsCache) window.translationsCache = {};
+    window.translationsCache[lang] = loadedTranslations[lang];
+    return loadedTranslations[lang];
+  }
+
+  // 3. Tentar carregar o arquivo sob demanda (sem bloquear a thread)
+  try {
+    if (!window.translationsCache) window.translationsCache = {};
+
+    // Inicializar com alguns textos básicos
+    const basicTranslations = {
+      calculating_route: "Calculando rota...",
+      location_error: "Erro ao obter localização",
+      route_error: "Erro ao calcular rota",
+      recalculating: "Recalculando rota...",
+      navigation_arrived: "Você chegou ao seu destino!",
+      routeDeviated: "Você se desviou da rota",
+      offRoute: "Fora da rota",
+      routeRecalculatedOk: "Rota recalculada com sucesso",
+      noInstructions: "Sem instruções disponíveis",
+
+      // Adicionar direções de navegação críticas
+      navigation_turn_left: "Vire à esquerda",
+      navigation_turn_right: "Vire à direita",
+      navigation_turn_slight_left: "Faça uma leve curva à esquerda",
+      navigation_turn_slight_right: "Faça uma leve curva à direita",
+      navigation_turn_sharp_left: "Faça uma curva acentuada à esquerda",
+      navigation_turn_sharp_right: "Faça uma curva acentuada à direita",
+      navigation_continue: "Continue em frente",
+      navigation_arrive_at_your_destination: "Chegou ao seu destino",
+      navigation_arrive_at_your_destination_on_the_right:
+        "Chegou ao seu destino, à direita",
+    };
+
+    // Armazenar as traduções básicas
+    window.translationsCache[lang] = basicTranslations;
+
+    // Iniciar carregamento assíncrono do arquivo de tradução completo
+    loadTranslationFile(lang)
+      .then((translations) => {
+        if (translations) {
+          // Quando o arquivo for carregado, atualizar o cache
+          window.translationsCache[lang] = {
+            ...window.translationsCache[lang],
+            ...translations,
+          };
+          console.log(
+            `[getTranslations] Carregamento assíncrono de traduções para ${lang} concluído.`
+          );
+        }
+      })
+      .catch((error) => {
+        console.error(
+          `[getTranslations] Erro ao carregar traduções assíncronas para ${lang}:`,
+          error
+        );
+      });
+
+    // Retornar as traduções básicas enquanto aguarda o carregamento completo
+    return basicTranslations;
+  } catch (error) {
+    console.error(
+      `[getTranslations] Erro ao processar traduções para: ${lang}`,
+      error
+    );
+
+    // Em caso de erro, retornar um objeto vazio para evitar erros em cascata
+    return {};
+  }
 }
 
 /**
@@ -310,14 +439,3 @@ export function preloadTranslations() {
       );
     });
 }
-
-// Iniciar o pré-carregamento
-preloadTranslations();
-
-// Adicionar após a declaração da função showWeatherWidget
-document.addEventListener("languageChanged", async () => {
-  // Atualizar o widget quando o idioma for alterado
-  if (typeof updateWidget === "function") {
-    await updateWidget();
-  }
-});

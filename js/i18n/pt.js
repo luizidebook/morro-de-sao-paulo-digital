@@ -1,15 +1,43 @@
 export default {
-  // Configurações
-  settings_title: "Configurações do Sistema",
-  settings_language: "Idioma do Assistente",
-  settings_voice: "Voz do Assistente",
-  settings_voice_speed: "Velocidade da Fala",
-  settings_voice_enabled: "Voz do Assistente",
-  settings_theme: "Tema da Interface",
+  // Traduções para configurações
+  settings_title: "Configurações",
+  settings_close: "Fechar",
+  settings_language: "Idioma",
+  settings_voice: "Voz",
+  settings_voice_speed: "Velocidade da voz",
+  settings_voice_enabled: "Voz ativada",
+  settings_theme: "Tema",
   settings_theme_light: "Claro",
   settings_theme_dark: "Escuro",
   settings_theme_auto: "Automático",
-  settings_close: "Fechar",
+
+  // Traduções para navegação
+  navigation_head_south_on_escada_da_rua_do_farol:
+    "Siga ao sul pela Escada da Rua do Farol",
+  navigation_turn_slight_left: "Faça uma leve curva à esquerda",
+  navigation_turn_left_onto_praça_aureliano_lima:
+    "Vire à esquerda na Praça Aureliano Lima",
+  navigation_turn_slight_left_onto_rua_caminho_da_praia:
+    "Faça uma leve curva à esquerda na Rua Caminho da Praia",
+  navigation_turn_slight_right_onto_rua_caminho_da_praia:
+    "Faça uma leve curva à direita na Rua Caminho da Praia",
+  navigation_turn_right: "Vire à direita",
+  navigation_on: "na",
+  navigation_for: "por",
+  navigation_arrive_at_your_destination: "Chegou ao seu destino",
+  navigation_continue: "Continue em frente",
+  navigation_roundabout: "Na rotatória",
+  navigation_turn_sharp_left: "Faça uma curva acentuada à esquerda",
+  navigation_turn_sharp_right: "Faça uma curva acentuada à direita",
+  navigation_continue_straight: "Siga em frente",
+  navigation_arrived: "Chegou ao destino",
+  navigation_arrive_destination: "Chegou ao seu destino",
+  navigation_head: "Siga",
+  navigation_head_southwest_on_escada_da_rua_do_farol:
+    "Siga ao sudoeste pela Escada da Rua do Farol",
+  navigation_arrive_at_your_destination_on_the_left:
+    "Chegou ao seu destino, à esquerda",
+
   // Mensagens gerais
   welcome_message:
     "👋 Olá! Sou o assistente virtual do Morro Digital. Como posso ajudar você hoje?",
@@ -251,6 +279,14 @@ export default {
   Head_northwest: "Siga para o noroeste",
   Head_southeast: "Siga para o sudeste",
   Head_southwest: "Siga para o sudoeste",
+  direction_north: "norte",
+  direction_south: "sul",
+  direction_east: "leste",
+  direction_west: "oeste",
+  direction_northeast: "nordeste",
+  direction_northwest: "noroeste",
+  direction_southeast: "sudeste",
+  direction_southwest: "sudoeste",
 
   // Elementos da interface do banner
   instruction_banner_title: "Instruções de navegação",

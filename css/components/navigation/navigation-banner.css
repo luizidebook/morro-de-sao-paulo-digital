@@ -393,3 +393,131 @@
 .instruction-banner.large-text .instruction-extra {
   font-size: 1.1rem;
 }
+
+/* Estilos para destacar o banner em diferentes situações */
+.instruction-banner.highlight-approaching {
+  animation: pulse-light 2s ease-in-out;
+  border: 2px solid #ffd700;
+}
+
+.instruction-banner.highlight-imminent {
+  animation: pulse-medium 1.5s ease-in-out;
+  border: 3px solid #ff9900;
+  background-color: rgba(255, 153, 0, 0.1);
+}
+
+.instruction-banner.highlight-now {
+  animation: pulse-strong 1s ease-in-out infinite;
+  border: 4px solid #ff3300;
+  background-color: rgba(255, 51, 0, 0.15);
+}
+
+@keyframes pulse-light {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 215, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 215, 0, 0.4);
+  }
+}
+
+@keyframes pulse-medium {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 153, 0, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(255, 153, 0, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 153, 0, 0.5);
+  }
+}
+
+@keyframes pulse-strong {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 51, 0, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 51, 0, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 51, 0, 0.6);
+  }
+}
+
+/* Estilos para destacar o banner em diferentes situações */
+
+.instruction-banner.highlight {
+  animation: pulse-highlight 0.6s ease;
+}
+
+@keyframes pulse-highlight {
+  0% {
+    transform: translateY(0);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  50% {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  }
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+}
+
+.instruction-banner.highlight-approaching {
+  animation: pulse-light 2s ease-in-out;
+  border: 2px solid #ffd700;
+}
+
+.instruction-banner.highlight-imminent {
+  animation: pulse-medium 1.5s ease-in-out;
+  border: 3px solid #ff9900;
+  background-color: rgba(255, 153, 0, 0.1);
+}
+
+.instruction-banner.highlight-now {
+  animation: pulse-strong 1s ease-in-out infinite;
+  border: 4px solid #ff3300;
+  background-color: rgba(255, 51, 0, 0.15);
+}
+
+@keyframes pulse-light {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 215, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 215, 0, 0.4);
+  }
+}
+
+@keyframes pulse-medium {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 153, 0, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(255, 153, 0, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 153, 0, 0.5);
+  }
+}
+
+@keyframes pulse-strong {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 51, 0, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 51, 0, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 51, 0, 0.6);
+  }
+}

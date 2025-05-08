@@ -303,6 +303,24 @@ function getTranslations(lang) {
 
     // Inicializar com alguns textos básicos
     const basicTranslations = {
+      welcome_message:
+        "👋 Olá! Sou o assistente virtual do Morro Digital. Como posso ajudar você hoje?",
+      ask_first_time:
+        "É a sua primeira vez em Morro de São Paulo? Posso te mostrar os melhores lugares para visitar.",
+      input_placeholder: "Digite o texto aqui...",
+
+      settings_title: "Configurações",
+      settings_close: "Fechar",
+      settings_language: "Idioma",
+      settings_voice: "Voz",
+      settings_voice_speed: "Velocidade da voz",
+      settings_voice_enabled: "Voz ativada",
+      settings_theme: "Tema",
+      settings_theme_light: "Claro",
+      settings_theme_dark: "Escuro",
+      settings_theme_auto: "Automático",
+      settings_language_select: "Selecione o idioma",
+
       calculating_route: "Calculando rota...",
       location_error: "Erro ao obter localização",
       route_error: "Erro ao calcular rota",
@@ -314,16 +332,60 @@ function getTranslations(lang) {
       noInstructions: "Sem instruções disponíveis",
 
       // Adicionar direções de navegação críticas
-      navigation_turn_left: "Vire à esquerda",
-      navigation_turn_right: "Vire à direita",
+
+      // Traduções para navegação
+      navigation_head_south_on_escada_da_rua_do_farol:
+        "Siga ao sul pela Escada da Rua do Farol",
       navigation_turn_slight_left: "Faça uma leve curva à esquerda",
-      navigation_turn_slight_right: "Faça uma leve curva à direita",
+      navigation_turn_left_onto_praça_aureliano_lima:
+        "Vire à esquerda na Praça Aureliano Lima",
+      navigation_turn_slight_left_onto_rua_caminho_da_praia:
+        "Faça uma leve curva à esquerda na Rua Caminho da Praia",
+      navigation_turn_slight_right_onto_rua_caminho_da_praia:
+        "Faça uma leve curva à direita na Rua Caminho da Praia",
+      navigation_turn_right: "Vire à direita",
+      navigation_on: "na",
+      navigation_for: "por",
+      navigation_arrive_at_your_destination: "Chegou ao seu destino",
+      navigation_continue: "Continue em frente",
+      navigation_roundabout: "Na rotatória",
       navigation_turn_sharp_left: "Faça uma curva acentuada à esquerda",
       navigation_turn_sharp_right: "Faça uma curva acentuada à direita",
-      navigation_continue: "Continue em frente",
-      navigation_arrive_at_your_destination: "Chegou ao seu destino",
+      navigation_continue_straight: "Siga em frente",
+      navigation_arrived: "Chegou ao destino",
+      navigation_arrive_destination: "Chegou ao seu destino",
+      navigation_head: "Siga",
+      navigation_head_southwest_on_escada_da_rua_do_farol:
+        "Siga ao sudoeste pela Escada da Rua do Farol",
+      navigation_arrive_at_your_destination_on_the_left:
+        "Chegou ao seu destino, à esquerda",
       navigation_arrive_at_your_destination_on_the_right:
         "Chegou ao seu destino, à direita",
+      // Adicione estas traduções para clima
+      weather_chuva: "Chuva",
+      weather_rain_light: "Chuva leve",
+      weather_rain_moderate: "Chuva moderada",
+      weather_rain_heavy: "Chuva forte",
+      weather_clear_day: "Céu limpo (dia)",
+      weather_clear_night: "Céu limpo (noite)",
+      weather_cloudy: "Nublado",
+      weather_fog: "Neblina",
+      weather_freezing_rain: "Chuva congelante",
+      weather_ice_pellets: "Granizo",
+      weather_ice_pellets_heavy: "Granizo forte",
+      weather_ice_pellets_light: "Granizo leve",
+      weather_mostly_clear_day: "Predominantemente limpo (dia)",
+      weather_mostly_clear_night: "Predominantemente limpo (noite)",
+      weather_mostly_cloudy_day: "Predominantemente nublado (dia)",
+      weather_mostly_cloudy_night: "Predominantemente nublado (noite)",
+      weather_partly_cloudy_day: "Parcialmente nublado (dia)",
+      weather_partly_cloudy_night: "Parcialmente nublado (noite)",
+      weather_snow: "Neve",
+      weather_snow_heavy: "Neve forte",
+      weather_snow_light: "Neve leve",
+      weather_thunderstorm: "Tempestade com trovoadas",
+      weather_hurricane: "Furacão",
+      weather_tropical_storm: "Tempestade tropical",
     };
 
     // Armazenar as traduções básicas

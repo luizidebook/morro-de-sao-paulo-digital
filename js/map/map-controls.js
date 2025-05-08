@@ -1786,8 +1786,6 @@ export function getBestEffortLocation(
     // Indicador visual de carregamento
     const loadingIndicator = addLoadingIndicator("Obtendo sua localização...");
 
-    showNotification("Tentando obter sua localização...", "info");
-
     // Esta função executa uma única vez no final, seja por sucesso ou erro
     function finish(forced = false) {
       if (finished) return;

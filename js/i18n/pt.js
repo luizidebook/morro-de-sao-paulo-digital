@@ -37,6 +37,8 @@ export default {
     "Siga ao sudoeste pela Escada da Rua do Farol",
   navigation_arrive_at_your_destination_on_the_left:
     "Chegou ao seu destino, à esquerda",
+  navigation_arrive_at_your_destination_on_the_right:
+    "Chegou ao seu destino, à direita",
 
   // Mensagens gerais
   welcome_message:
@@ -188,6 +190,30 @@ export default {
   weather_sleet: "Aguaneve",
   weather_fair: "Bom tempo",
   weather_unknown: "Sem informações",
+  weather_chuva: "Chuva",
+  weather_rain_light: "Chuva leve",
+  weather_rain_moderate: "Chuva moderada",
+  weather_rain_heavy: "Chuva forte",
+  weather_clear_day: "Céu limpo (dia)",
+  weather_clear_night: "Céu limpo (noite)",
+  weather_cloudy: "Nublado",
+  weather_fog: "Neblina",
+  weather_freezing_rain: "Chuva congelante",
+  weather_ice_pellets: "Granizo",
+  weather_ice_pellets_heavy: "Granizo forte",
+  weather_ice_pellets_light: "Granizo leve",
+  weather_mostly_clear_day: "Predominantemente limpo (dia)",
+  weather_mostly_clear_night: "Predominantemente limpo (noite)",
+  weather_mostly_cloudy_day: "Predominantemente nublado (dia)",
+  weather_mostly_cloudy_night: "Predominantemente nublado (noite)",
+  weather_partly_cloudy_day: "Parcialmente nublado (dia)",
+  weather_partly_cloudy_night: "Parcialmente nublado (noite)",
+  weather_snow: "Neve",
+  weather_snow_heavy: "Neve forte",
+  weather_snow_light: "Neve leve",
+  weather_thunderstorm: "Tempestade com trovoadas",
+  weather_hurricane: "Furacão",
+  weather_tropical_storm: "Tempestade tropical",
 
   // Dicas de clima
   weather_tip_storm:

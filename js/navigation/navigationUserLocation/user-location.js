@@ -1895,18 +1895,6 @@ function displayRouteFromData(
   }
 }
 
-// Inicializar o sistema ao carregar o módulo
-(function initializeLocationSystem() {
-  // Carregar o plugin de rotação de marcadores
-  import("../../plugins/leaflet.rotatedMarker.js")
-    .then(() => {
-      console.log("[user-location] Plugin de rotação de marcadores carregado");
-    })
-    .catch((err) => {
-      console.warn("[user-location] Erro ao carregar plugin de rotação:", err);
-    });
-})();
-
 /**
  * Modifica o marcador do usuário para apontar para um destino específico
  * Pode ser chamado imediatamente após plotRouteOnMap

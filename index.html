@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#3b82f6" />
+    <meta name="msapplication-navbutton-color" content="#3b82f6">
+    <meta name="apple-mobile-web-app-status-bar-style" content="#3b82f6">
+    <meta
+      name="description"
+      content="Guia digital interativo de Morro de São Paulo"
+    />
+    <title>Morro Digital</title>
+    <link rel="stylesheet" href="./css/main.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+    />
+<!-- Certificar-se que o Leaflet é carregado antes do plugin -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="./js/lib/leaflet.polylineDecorator.js"></script>
+<script src="js/lib/leaflet.polylineDecorator.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <!-- Removido leaflet-routing-machine pois não será mais usado -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/swiper/swiper-bundle.min.css"
+    />
+    <script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js/dist/fuse.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper/swiper-bundle.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/swiper/swiper-bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/weather-icons/2.0.10/css/weather-icons.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+
+  <body>
+    <!-- App Shell -->
+    <div class="app-shell">
+      <!-- Cabeçalho -->
+      <header>
+        <div class="header-content">
+          <h1 data-i18n="welcome_message">Morro Digital</h1>
+          <p class="tagline" data-i18n="ask_first_time">Descubra o paraíso</p>
+        </div>
+      </header>
+
+      <!-- Mapa -->
+        <div id="map-container">
+          <div id="map"></div>
+          <!-- O widget será inserido aqui -->
+        </div>
+      </section>
+
+      <!-- Submenu dinâmico -->
+      <section id="submenu" class="hidden">
+        <div class="submenu-header">
+          <h3 class="submenu-title">Explorar Locais</h3>
+          <button class="close-button" aria-label="Fechar menu">×</button>
+        </div>
+        <div id="submenuContainer" aria-live="polite"></div>
+      </section>
+
+<!-- Quick Action Buttons -->
+<div class="quick-actions">
+  <button class="action-button primary mood-button" data-mood="happy">
+    <img class="mood-icon" src="./assets/emojis/sun_emojis/sun_emoji_1.png" alt="Humor do assistente">
+  </button>
+</div>
+
+      <!-- Assistente Virtual -->            
+      <div id="assistant-messages" class="assistant-modal hidden">
+        <button class="minimize-button" aria-label="Minimizar assistente">×</button>
+        <div class="messages-area"></div>
+    <!-- Quando em modo normal -->
+    <div class="message assistant" data-message-type="standard"></div>
+    <!-- Quando em modo de navegação -->
+
+      <!-- Carrossel sem espaços desnecessários -->
+  <div class="message assistant carousel-container">
+    <div class="swiper-container">
+      <!-- Conteúdo do swiper -->
+    </div>
+    <div class="carousel-info-text">Primeira Praia</div>
+  </div>
+  
+  <!-- Mensagem de seguimento compacta, sem espaços extras -->
+  <div class="message assistant carousel-follow-up">
+    Gostaria de mais informações, como chegar ou ver outro local?
+  </div>
+  <!-- Mensagem de navegação, com espaço para instruções -->
+  <div class="navigation-instruction-area"></div></div>      
+<!-- Campo de input do assistente, fora do balão -->
+<div id="assistant-input-area" class="assistant-input-area">
+  <input
+    type="text"
+    id="assistantInput"
+    placeholder="Pergunte algo sobre Morro de São Paulo..."
+    aria-label="Campo de entrada do assistente"
+  />
+  <button id="sendButton" aria-label="Enviar mensagem">
+    <i class="fas fa-paper-plane"></i>
+  </button>
+  <button id="voiceButton" aria-label="Enviar mensagem de voz">
+    <i class="fas fa-microphone"></i>
+  </button>
+  <button id="configButton" aria-label="Configurações do assistente">
+    <i class="fas fa-cog"></i>
+  </button>
+</div>
+       
+
+<div id="instruction-banner" class="instruction-banner hidden">
+  <div class="instruction-primary">
+    <span id="instruction-arrow">⬆️</span>
+    <h2 id="instruction-main">Siga em frente</h2>
+    <button id="minimize-navigation-btn" aria-label="Minimizar instruções de navegação" aria-expanded="true"></button>
+  </div>
+  <div class="instruction-secondary">
+    <p id="instruction-details">200m - Rua Caminho do Farol</p>
+    <div class="instruction-extra">
+      <p id="instruction-distance">📏: 200m</p>
+      <p id="instruction-time">⏱️: 2 minutos</p>
+    </div>
+  </div>
+</div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+      <div class="loading-content">
+        <div class="spinner"></div>
+        <p>Carregando Morro Digital...</p>
+      </div>
+    </div>
+
+    <!-- Scripts principais -->
+    <script type="module" src="./main.js"></script>
+    <script>
+      // Remove loading overlay when content loads
+      window.addEventListener("load", function () {
+        setTimeout(function () {
+          document.getElementById("loading-overlay").classList.add("fade-out");
+        }, 800);
+      });
+
+    </script>
+  </body>
+</html>
+

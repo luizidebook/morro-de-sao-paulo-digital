@@ -1,0 +1,395 @@
+/* Estilos modernos para o banner de navegação */
+.instruction-banner {
+  /* Variáveis para fácil personalização */
+  --primary-color: #0067e6;
+  --primary-gradient: linear-gradient(135deg, #2563eb, #3b82f6);
+  --secondary-color: #f8fafc;
+  --accent-color: #38bdf8;
+  --text-color: #f8fafc;
+  --secondary-text: #334155;
+  --border-radius: 16px;
+  --shadow-strength: 0.25;
+  --animation-speed: 0.3s;
+  --icon-size: 48px;
+
+  /* Posicionamento */
+  position: fixed;
+  left: 50%;
+  top: 1px;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430vh;
+  z-index: 2100;
+
+  /* Design visual */
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, var(--shadow-strength)),
+    0 5px 12px rgba(0, 0, 0, calc(var(--shadow-strength) * 0.6));
+  background-color: #fff;
+
+  /* Efeito de vidro */
+  backdrop-filter: blur(10px);
+
+  /* Animações suaves */
+  transition: transform var(--animation-speed) cubic-bezier(0.4, 0, 0.2, 1),
+    opacity var(--animation-speed) cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow var(--animation-speed) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Estado oculto do banner */
+.instruction-banner.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(30px);
+  pointer-events: none;
+}
+
+/* Seção primária - cabeçalho com instrução principal */
+.instruction-primary {
+  display: flex;
+  align-items: center;
+  background: var(--primary-gradient);
+  color: var(--text-color);
+  position: relative;
+}
+
+/* Seta de direção aprimorada */
+#instruction-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--icon-size);
+  height: var(--icon-size);
+  font-size: 1.8rem;
+  margin-right: 16px;
+  transform-origin: center;
+  transition: transform 0.5s ease, background-color 0.3s ease;
+}
+
+/* Rotação da seta - animação contínua */
+.rotating {
+  animation: rotateIcon 2s infinite linear;
+}
+
+@keyframes rotateIcon {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Texto principal da instrução */
+#instruction-main {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin: 0;
+  flex-grow: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  letter-spacing: 0.01em;
+}
+
+/* Botão de minimizar estilizado */
+#minimize-navigation-btn {
+  width: 28px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  border-radius: 50%;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#minimize-navigation-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+#minimize-navigation-btn:active {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(0.95);
+}
+
+/* Estilizando o "X" do botão minimizar */
+#minimize-navigation-btn::before,
+#minimize-navigation-btn::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 2px;
+  background: white;
+  left: 50%;
+  top: 50%;
+  transform-origin: center;
+  transition: transform 0.3s ease;
+}
+
+/* Quando banner expandido, mostrar um "X" */
+.instruction-banner:not(.minimized) #minimize-navigation-btn::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.instruction-banner:not(.minimized) #minimize-navigation-btn::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+/* Quando banner minimizado, mostrar um "+" */
+.instruction-banner.minimized #minimize-navigation-btn::before {
+  transform: translate(-50%, -50%);
+}
+
+.instruction-banner.minimized #minimize-navigation-btn::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+/* Seção secundária - detalhes da navegação */
+.instruction-secondary {
+  display: block !important;
+  max-height: none !important;
+  overflow: visible !important;
+  opacity: 1 !important;
+  transition: all 0.3s ease-out;
+}
+
+/* Detalhes da instrução */
+#instruction-details {
+  font-size: 1rem;
+  margin: 0 0 0.75rem;
+  color: var(--secondary-text);
+  line-height: 1.4;
+}
+
+/* Área de informações extras (distância e tempo) */
+.instruction-extra {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  color: var(--secondary-text);
+  margin-top: 0.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  padding-top: 0.5rem;
+}
+
+.instruction-extra p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
+.instruction-extra span {
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+/* Barra de progresso da rota */
+.progress-container {
+  position: relative;
+  height: 4px;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--accent-color);
+  transition: width 0.5s ease;
+}
+
+/* Quando minimizado */
+.instruction-banner.minimized .instruction-secondary {
+  max-height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  padding: 0;
+}
+
+/* Estado destacado do banner */
+.instruction-banner.highlight {
+  box-shadow: 0 8px 30px rgba(38, 99, 235, 0.4),
+    0 4px 15px rgba(38, 99, 235, 0.3);
+  transform: translateX(-50%) translateY(-5px);
+}
+
+/* Animação para próxima curva */
+.approaching-turn .instruction-primary {
+  animation: pulse-highlight 1.2s infinite;
+}
+
+.approaching-turn #instruction-arrow {
+  animation: pulse-bounce 1.2s infinite;
+}
+
+@keyframes pulse-highlight {
+  0%,
+  100% {
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+  }
+  50% {
+    background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  }
+}
+
+@keyframes pulse-bounce {
+  0%,
+  100% {
+    transform: scale(1);
+    background: rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    transform: scale(1.1);
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Personalizações para diferentes tipos de setas */
+.turn-left #instruction-arrow {
+  transform: rotate(-90deg);
+}
+
+.turn-right #instruction-arrow {
+  transform: rotate(90deg);
+}
+
+.turn-slight-left #instruction-arrow {
+  transform: rotate(-45deg);
+}
+
+.turn-slight-right #instruction-arrow {
+  transform: rotate(45deg);
+}
+
+.turn-sharp-left #instruction-arrow {
+  transform: rotate(-135deg);
+}
+
+.turn-sharp-right #instruction-arrow {
+  transform: rotate(135deg);
+}
+
+.turn-uturn #instruction-arrow {
+  transform: rotate(180deg);
+}
+
+.arrive #instruction-arrow {
+  background: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.5rem;
+}
+
+/* Agrupamento visual para distância/tempo */
+.metrics-group {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 8px;
+  width: 48%;
+}
+
+.metric-label {
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.5);
+  margin-bottom: 0.25rem;
+}
+
+.metric-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--secondary-text);
+}
+
+/* Animações de entrada/saída */
+.instruction-banner.entry-animation {
+  animation: slide-up 0.4s ease-out forwards;
+}
+
+.instruction-banner.closing {
+  animation: slide-down 0.3s ease-in forwards;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateX(-50%) translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-down {
+  from {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-50%) translateY(50px);
+    opacity: 0;
+  }
+}
+
+/* Suporte para tema escuro */
+@media (prefers-color-scheme: dark) {
+  .instruction-banner {
+    --secondary-color: #1e293b;
+    --secondary-text: #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .instruction-extra {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .progress-container {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .metric {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .metric-label {
+    color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+/* Estilos para modo de alto contraste */
+.instruction-banner.high-contrast {
+  --primary-gradient: linear-gradient(135deg, #000066, #0000cc);
+  --secondary-color: #ffffff;
+  --accent-color: #ffcc00;
+  --secondary-text: #000000;
+}
+
+/* Estilos para texto grande */
+.instruction-banner.large-text #instruction-main {
+  font-size: 1.8rem;
+}
+
+.instruction-banner.large-text #instruction-details {
+  font-size: 1.2rem;
+}
+
+.instruction-banner.large-text .instruction-extra {
+  font-size: 1.1rem;
+}

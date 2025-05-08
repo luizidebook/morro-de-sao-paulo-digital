@@ -1,0 +1,94 @@
+/* Sistema de posicionamento para elementos da interface */
+
+/* Classe base para áreas de conteúdo flutuantes */
+.floating-container {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  max-width: 95%;
+  box-shadow: var(--shadow-lg);
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-sizing: border-box;
+}
+
+/* Áreas específicas - posicionamento em camadas */
+.assistant-container {
+  bottom: 90px;
+  z-index: 2000;
+  width: auto;
+  min-width: 280px;
+}
+
+.navigation-container {
+  bottom: 160px;
+  z-index: 2100; /* Acima do assistente */
+  max-width: 450px;
+  width: 90%;
+}
+
+/* Modo de navegação ativa - reorganização vertical */
+body.navigation-active .assistant-container {
+  bottom: 180px; /* Mais alto quando a navegação está ativa */
+}
+
+body.navigation-active .navigation-container {
+  bottom: 90px;
+}
+
+/* Responsividade */
+@media (max-height: 700px) {
+  .assistant-container {
+    bottom: 80px;
+  }
+
+  .navigation-container {
+    bottom: 150px;
+  }
+
+  body.navigation-active .assistant-container {
+    bottom: 160px;
+  }
+
+  body.navigation-active .navigation-container {
+    bottom: 80px;
+  }
+}
+
+/* Modo paisagem */
+@media (orientation: landscape) {
+  .assistant-container {
+    left: 30%;
+    max-width: 35%;
+  }
+
+  .navigation-container {
+    left: 70%;
+    max-width: 35%;
+  }
+
+  body.navigation-active .assistant-container,
+  body.navigation-active .navigation-container {
+    transform: translateX(-50%);
+  }
+}
+
+/* Compatibilidade com notch e áreas seguras */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .assistant-container {
+    bottom: calc(90px + env(safe-area-inset-bottom) / 2);
+  }
+
+  .navigation-container {
+    bottom: calc(160px + env(safe-area-inset-bottom) / 2);
+  }
+
+  body.navigation-active .assistant-container {
+    bottom: calc(180px + env(safe-area-inset-bottom) / 2);
+  }
+
+  body.navigation-active .navigation-container {
+    bottom: calc(90px + env(safe-area-inset-bottom) / 2);
+  }
+}

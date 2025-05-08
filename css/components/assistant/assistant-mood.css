@@ -1,0 +1,102 @@
+/* Estilos para o sistema de humor do assistente */
+
+/* Manter apenas este seletor específico */
+.quick-actions .action-button.primary.mood-button {
+  position: fixed;
+  bottom: 110px; /* Acima da área de input */
+  left: 10px;
+  width: 200px;
+  height: 100px;
+  min-width: 200px;
+  min-height: 100px;
+  font-size: 2rem;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  display: block;
+  cursor: pointer;
+  z-index: 10000000000000000001; /* Aumentado de 999 para 1001 */
+  overflow: visible;
+}
+
+/* Estilos do ícone */
+.quick-actions .action-button.primary.mood-button i {
+  display: none;
+}
+
+.quick-actions .action-button.primary.mood-button img.mood-icon {
+  width: 100px;
+  height: 100px;
+  bottom: 10px;
+  display: block;
+  object-fit: contain;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  z-index: 100000000000000000000000000000000000000;
+}
+
+.mood-icon {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Estilos específicos para cada humor */
+.action-button[data-mood="happy"] {
+  background-color: #4dabf7;
+}
+
+.action-button[data-mood="excited"] {
+  background-color: #f76707;
+}
+
+.action-button[data-mood="surprised"] {
+  background-color: #ae3ec9;
+}
+
+.action-button[data-mood="thinking"] {
+  background-color: #7950f2;
+}
+
+.action-button[data-mood="sad"] {
+  background-color: #74c0fc;
+}
+
+.action-button[data-mood="sleepy"] {
+  background-color: #748ffc;
+}
+
+.action-button[data-mood="cool"] {
+  background-color: #20c997;
+}
+
+.action-button[data-mood="love"] {
+  background-color: #f783ac;
+}
+
+.action-button[data-mood="neutral"] {
+  background-color: #1971c2;
+}
+
+/* Animações extras */
+@keyframes float {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.floating-mood {
+  animation: float 3s ease-in-out infinite;
+}

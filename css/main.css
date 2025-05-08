@@ -1,0 +1,33 @@
+/* Base */
+@import "base/variables.css";
+@import "base/reset.css";
+@import "base/typography.css";
+@import "base/animations.css";
+
+/* Layout */
+@import "layout/app-shell.css";
+@import "layout/map.css";
+
+/* Components buttons */
+@import "components/buttons/buttons.css";
+
+@import "components/popups.css";
+
+@import "components/assistant/assistantModalUI.css";
+@import "components/assistant/assistant-mood.css";
+
+/* Importações dos módulos de carousel */
+@import "components/carousel/carousel.css";
+
+/* Importações dos módulos de inputs */
+@import "components/inputs/inputs.css";
+
+@import "components/weather.css";
+@import "components/assistant/assistant-voice-selector.css";
+/* Adicionar esta importação se ainda não existir */
+
+/* Vendor */
+@import "vendor/leaflet-custom.css";
+
+/* Media queries globais */
+@import "base/responsive.css";

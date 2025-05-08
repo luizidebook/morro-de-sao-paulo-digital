@@ -1,0 +1,95 @@
+/* Melhorias no estilo do toggle switch para garantir visibilidade e toque */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 3.125rem; /* 50px */
+  height: 1.75rem; /* 28px - Aumentado para melhor toque */
+  margin-left: var(--spacing-sm); /* 10px */
+  flex-shrink: 0; /* Evitar que encolha em flex containers */
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 1.75rem; /* Metade da altura */
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 1.25rem; /* 20px - Aumentado */
+  width: 1.25rem; /* 20px - Aumentado */
+  left: var(--spacing-xs); /* 4px */
+  bottom: calc((1.75rem - 1.25rem) / 2); /* Centraliza verticalmente (28px - 20px) / 2 = 4px */
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+input:checked + .toggle-slider {
+  background-color: var(--primary); /* Era #4285f4 */
+}
+
+input:focus + .toggle-slider {
+  box-shadow: 0 0 1px var(--primary);
+}
+
+input:checked + .toggle-slider:before {
+  /* Distância = Largura total - Largura handle - 2 * Espaçamento esquerdo */
+  transform: translateX(calc(3.125rem - 1.25rem - 2 * var(--spacing-xs))); /* 50px - 20px - 8px = 22px -> 1.375rem */
+}
+
+/* Garantir que o container do toggle esteja alinhado corretamente */
+.voice-toggle-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-xs) 0; /* 8px */
+  margin: var(--spacing-xs) 0; /* 5px */
+}
+
+/* Remover indicador ::after, pode ser confuso e não acessível */
+/* .toggle-switch::after { ... } */
+
+/* Melhorar o painel de configurações para comportamento responsivo */
+/* Estilos do .config-panel movidos para buttons.css onde faz mais sentido */
+
+/* Adicionar regras gerais conforme checklist */
+
+/* Aplicar flex-wrap a containers específicos onde necessário */
+/* Exemplo: .some-container { display: flex; flex-wrap: wrap; gap: var(--spacing-md); } */
+
+/* Aplicar quebra de palavra a elementos de texto propensos a overflow */
+.config-option label,
+.submenu-item-description, /* Se ainda não tiver */
+.tagline /* Se ainda não tiver */
+{
+  overflow-wrap: break-word;
+  word-wrap: break-word; /* Fallback */
+  word-break: break-word; /* Opcional, mais agressivo */
+}
+
+/* Ajustar config-option para usar flex se fizer sentido */
+.config-option {
+  margin-bottom: var(--spacing-md);
+  /* display: flex; */ /* Descomentar se layout flex for desejado */
+  /* flex-direction: column; */ /* Ou row */
+  /* gap: var(--spacing-xs); */
+}
+

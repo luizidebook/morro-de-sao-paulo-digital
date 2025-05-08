@@ -1,0 +1,568 @@
+/* Estilos base para carousel */
+
+/* Configurações básicas para slides */
+#assistant-messages .swiper-container {
+  /* Adicionado conforme checklist */
+  touch-action: pan-x;
+
+  /* Estilos existentes, com conversões e variáveis */
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important; /* Alterar de altura fixa para auto */
+  min-height: 10px !important; /* Garantir uma altura mínima */
+  max-height: 35vh !important; /* Limitar a altura máxima */
+  margin: 0 !important; /* Remover margem que causa desalinhamento */
+  box-sizing: border-box !important;
+  overflow: hidden !important; /* Manter overflow hidden no container */
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important; /* Arredondar apenas topo */
+  padding: 0 !important;
+  position: relative !important;
+  z-index: 1 !important;
+  flex-grow: 1 !important; /* Permitir crescimento para preencher espaço */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+#assistant-messages .swiper-wrapper {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: inherit !important;
+  box-sizing: border-box !important;
+  flex: 1 !important;
+  display: flex !important;
+}
+
+/* Garantir que cada slide seja exibido individualmente */
+#assistant-messages .swiper-slide {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: var(--gray-100) !important;
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden !important;
+  height: 100% !important;
+  width: 100% !important; /* Garantir largura completa */
+  box-sizing: border-box !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* Garantir que apenas um slide seja exibido por vez */
+.swiper-container {
+  width: 100% !important;
+  height: auto !important;
+  overflow: hidden !important;
+}
+
+#assistant-messages .swiper-slide img {
+  width: 100% !important;
+  height: 100% !important; /* Usar altura 100% para preencher o slide */
+  object-fit: cover !important; /* Mantido para cobrir a área do slide */
+  border-radius: var(--radius-lg) !important; /* 12px */
+  display: block !important;
+  max-width: 100% !important;
+  /* max-height: 100%; */ /* Removido pois height é auto */
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+#assistant-messages .swiper-slide img.loaded {
+  opacity: 1;
+}
+
+/* Força o Swiper do assistente a respeitar o tamanho do balão - REVISAR se ainda necessário */
+/* Muitas dessas regras podem ser redundantes ou excessivas com !important */
+
+/* Adicionar ao seu arquivo carousel.css */
+#assistant-messages .carousel-info-text {
+  margin: 0;
+  font-size: 13px;
+  text-align: center;
+  font-weight: 500;
+  color: var(--gray-800);
+  background-color: var(--gray-50);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  padding: 8px;
+  line-height: 1.4;
+}
+
+#assistant-messages .carousel-info-text .feedback-text {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--gray-700);
+  font-weight: normal;
+}
+
+/* Estilo para paginação - ajustado para garantir visibilidade dentro do slide */
+.swiper-pagination {
+  bottom: 10px !important; /* Ajustado para ficar mais visível dentro do slide */
+  position: absolute !important;
+  z-index: 10 !important;
+  width: 100% !important;
+  text-align: center !important;
+  transition: opacity 0.3s !important;
+  transform: translate3d(0, 0, 0) !important;
+  display: flex !important;
+  justify-content: center !important;
+  pointer-events: none !important; /* Evita que bloqueie interações */
+}
+
+#assistant-messages .swiper-container .swiper-pagination {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.swiper-pagination-bullet {
+  width: 8px !important; /* Garantido tamanho fixo */
+  height: 8px !important;
+  background: var(--primary) !important;
+  opacity: 0.5 !important;
+  margin: 0 4px !important; /* Espaçamento adequado entre os pontos */
+  border-radius: 50% !important;
+  pointer-events: auto !important; /* Permite clicar nos pontos */
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.3) !important; /* Adiciona sombra para melhorar visibilidade */
+}
+
+.swiper-pagination-bullet-active {
+  opacity: 1 !important;
+  background: var(--primary) !important;
+}
+
+/* Estilo para botões de navegação */
+.swiper-button-next,
+.swiper-button-prev {
+  color: var(--primary) !important;
+  background: rgba(255, 255, 255, 0.8); /* Fundo mais visível */
+  /* Garantir tamanho mínimo de toque 44x44px (2.75rem) */
+  width: 44px !important; /* Tamanho de toque adequado */
+  height: 44px !important;
+  border-radius: 50%;
+  display: flex !important; /* Adicionado para garantir alinhamento */
+  align-items: center !important;
+  justify-content: center !important;
+  top: 70% !important; /* Garantir centralização vertical */
+  transform: translateY(-50%) !important; /* Garantir centralização vertical */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.swiper-button-next:after,
+.swiper-button-prev:after {
+  font-size: 1.25rem !important; /* Era 1.2rem */
+  font-weight: bold;
+}
+
+/* Adicionar estas regras para garantir a visibilidade do carrossel */
+
+/* Estilo para quando o assistente está mostrando um carrossel */
+#assistant-messages.showing-carousel {
+  max-height: 70vh !important; /* Permitir mais espaço para o carrossel */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+#assistant-messages.showing-carousel .messages-area {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Garantir que o carrossel seja visível dentro da mensagem */
+#assistant-messages .message.carousel-container {
+  padding: 0;
+  margin: 0; /* Remover margens */
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background-color: transparent; /* Fundo transparente para evitar sobreposição */
+}
+
+/* Ajustar altura do container para mostrar carrossel adequadamente */
+#assistant-messages .message.carousel-container .swiper-container {
+  /* Ajustar se necessário - já deve ter configurações base */
+  height: 13.125rem !important; /* 210px / 16px */
+  max-width: 100% !important;
+  margin-top: 0 !important; /* Remover margin-top extra */
+}
+
+/* Ajustar o container para navegação */
+#assistant-messages.navigation-mode
+  .navigation-instruction-area
+  .carousel-container {
+  margin-top: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* Remover espaços entre a mensagem de pergunta adicional */
+#assistant-messages .message.assistant.carousel-info-text {
+  margin-top: 0;
+  margin-left: 10px;
+  margin-right: 10px;
+  padding: var(--spacing-xs) var(--spacing-xs);
+  border-radius: var(--radius-md);
+  background-color: var(--primary-light);
+}
+
+/* Definir posição específica para garantir visibilidade da paginação */
+#assistant-messages .swiper-container .swiper-pagination {
+  bottom: 15px !important;
+  left: 0 !important;
+  right: 0 !important;
+}
+
+/* Modificações para remover a estrutura de message.assistant do carousel */
+
+/* Garantir que o container do carrossel não seja formatado como message.assistant */
+/* Modificar seletores para não depender de .message.assistant */
+#assistant-messages .carousel-container {
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 65vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background-color: transparent;
+}
+
+/* Garantir que a paginação fique visível e posicionada corretamente */
+#assistant-messages .swiper-container .swiper-pagination {
+  bottom: 10px !important;
+  left: 0 !important;
+  right: 0 !important;
+  position: absolute !important;
+  z-index: 10 !important;
+  display: flex !important;
+  justify-content: center !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Modificar o JavaScript para não adicionar a classe message.assistant ao container do carrossel */
+
+/* Estilos para o texto de informação do carrossel */
+#assistant-messages .carousel-info-text {
+  margin: 0;
+  font-size: 13px;
+  text-align: center;
+  font-weight: 500;
+  color: var(--gray-800);
+  background-color: var(--gray-50);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  padding: 5px;
+}
+
+/* Adicionar ao final do arquivo */
+
+/* Melhorar o ajuste de altura para o carrossel */
+#assistant-messages.showing-carousel {
+  transition: height 0.3s ease;
+}
+
+#assistant-messages.showing-carousel .messages-area {
+  height: auto;
+  min-height: 80px;
+  transition: height 0.3s ease, min-height 0.3s ease;
+}
+
+/* Garantir visibilidade das imagens */
+#assistant-messages .swiper-slide img.loaded {
+  opacity: 1;
+  max-height: 45vh;
+  height: 100%;
+  display: block;
+}
+
+/* Melhorar a exibição da informação do carrossel */
+#assistant-messages .carousel-info-text {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Adicionar ao final do arquivo */
+
+#assistant-messages.showing-carousel.height-adjusted {
+  height: auto !important;
+  min-height: 280px !important;
+}
+
+/* Garantir que a área de mensagens exiba o carrossel corretamente */
+#assistant-messages.showing-carousel .messages-area {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  width: 100% !important;
+}
+
+/* Melhorar a exibição das imagens do carrossel */
+#assistant-messages .swiper-slide img {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  object-fit: cover !important;
+  min-height: 220px !important;
+  max-height: 65vh !important;
+  opacity: 0; /* Inicialmente invisível */
+  transition: opacity 0.3s ease !important;
+}
+
+#assistant-messages .swiper-slide img.loaded {
+  opacity: 1 !important; /* Visível quando carregada */
+}
+
+/* Texto de informações do carrossel */
+#assistant-messages .carousel-info-text {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 8px !important;
+  font-size: 14px !important;
+  text-align: center !important;
+  background-color: var(--gray-50) !important;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg) !important;
+}
+
+#assistant-messages .carousel-info-text .feedback-text {
+  display: block !important;
+  margin-top: 4px !important;
+  font-size: 15px !important;
+  color: var(--gray-700) !important;
+}
+
+/* NOVA ESTRUTURA DE CSS PARA CARROSSEL */
+
+/* Container do carrossel */
+.carousel-container {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+/* Container do Swiper */
+.carousel-container .swiper-container {
+  width: 100% !important;
+  height: auto !important; /* Altura automática baseada no conteúdo */
+  min-height: 220px !important; /* Altura mínima para garantir visibilidade */
+  max-height: 55vh !important; /* Altura máxima para telas grandes */
+  overflow: hidden !important;
+  flex: 1 !important; /* Permitir que cresça para preencher o espaço */
+}
+
+/* Slides individuais */
+.carousel-container .swiper-slide {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: auto !important; /* Mudar para auto para acompanhar a imagem */
+  background: #000 !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+/* Imagens dentro dos slides */
+.carousel-container .swiper-slide img {
+  width: 100% !important;
+  height: auto !important; /* Ajustar altura automaticamente */
+  object-fit: contain !important; /* Mudar para contain para manter proporção */
+  max-height: 100% !important;
+  display: block !important;
+  margin: 0 auto !important; /* Centralizar a imagem */
+  opacity: 0;
+  transition: opacity 0.3s ease !important;
+}
+
+.carousel-container .swiper-slide img.loaded {
+  opacity: 1 !important;
+}
+
+/* Área de informações */
+.carousel-info {
+  width: 100% !important;
+  height: 20% !important; /* 20% da altura para o texto */
+  padding: 10px !important;
+  background-color: #f0f4f8 !important;
+  color: #333 !important;
+  border-radius: 0 0 10px 10px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+/* Melhorar visibilidade dos botões de navegação */
+.carousel-container .swiper-button-next,
+.carousel-container .swiper-button-prev {
+  color: white !important;
+  background: rgba(0, 0, 0, 0.3) !important;
+  width: 30px !important;
+  height: 30px !important;
+  border-radius: 50% !important;
+}
+
+.carousel-container .swiper-button-next:after,
+.carousel-container .swiper-button-prev:after {
+  font-size: 16px !important;
+}
+
+/* Melhorar visibilidade da paginação */
+.carousel-container .swiper-pagination-bullet {
+  background: white !important;
+  opacity: 0.7 !important;
+}
+
+.carousel-container .swiper-pagination-bullet-active {
+  background: white !important;
+  opacity: 1 !important;
+}
+
+/* Garantir que div.message.assistant não atrapalhe o carrossel */
+#assistant-messages.showing-carousel .message.assistant:empty,
+#assistant-messages.showing-carousel
+  .message.assistant:not(.carousel-container):not(.carousel-info-text) {
+  display: none !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Garantir que apenas o container do carrossel seja visível */
+#assistant-messages.showing-carousel
+  .messages-area
+  > *:not(.carousel-container) {
+  display: none !important;
+}
+
+/* Ajustar o wrapper do swiper */
+.carousel-container .swiper-wrapper {
+  width: 100% !important;
+  height: auto !important; /* Altura baseada no conteúdo */
+  display: flex !important;
+  align-items: stretch !important; /* Esticar itens para mesma altura */
+}
+
+/* Controle específico de tamanho para melhorar consistência */
+.swiper-container-horizontal > .swiper-wrapper {
+  height: auto !important;
+}
+
+/* Garantir que cada slide mantenha a proporção da imagem */
+.swiper-slide {
+  height: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Definir proporção para contêiner de imagem vs texto */
+#assistant-messages.showing-carousel {
+  display: flex !important;
+  flex-direction: column !important;
+  height: auto !important;
+  min-height: 44px !important;
+}
+
+#assistant-messages.showing-carousel .messages-area {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+}
+
+/* Estilos para o cabeçalho do carrossel e botão minimizar */
+.carousel-header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 10;
+  padding: 8px;
+}
+
+.carousel-minimize-button {
+  background-color: transparent; /* Sem background */
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: 18px; /* Tamanho maior para melhor visibilidade */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, color 0.2s ease;
+  outline: none;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Texto mais destacado sem background */
+}
+
+.carousel-minimize-button:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.carousel-minimize-button:active {
+  transform: scale(0.95);
+}
+
+/* Ajustar o container para posicionamento relativo */
+.carousel-container {
+  position: relative !important;
+}
+
+/* Melhorar a visibilidade do botão em fundos claros */
+.carousel-minimize-button {
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Texto mais destacado sem background */
+}
+
+/* Remover alturas fixas e substituir por proporções */
+.carousel-container .swiper-container {
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 16/9 !important; /* Manter proporção de imagem consistente */
+  max-height: 50vh !important; /* Máximo de 50% da altura da viewport */
+  min-height: 150px !important; /* Altura mínima para garantir visibilidade */
+}
+
+.carousel-container .swiper-slide {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.carousel-container .swiper-slide img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* Garantir que a área de informações seja dimensionada adequadamente */
+.carousel-info-text {
+  padding: 10px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Para dispositivos com telas pequenas */
+@media (max-height: 500px) {
+  .carousel-container .swiper-container {
+    max-height: 40vh !important;
+  }
+
+  .carousel-info-text {
+    padding: 5px !important;
+    font-size: 12px !important;
+  }
+}

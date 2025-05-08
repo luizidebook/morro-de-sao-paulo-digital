@@ -1,0 +1,87 @@
+/* Melhorias no estilo do toggle switch para garantir visibilidade */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+  margin-left: 10px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 24px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+input:checked + .toggle-slider {
+  background-color: #4285f4; /* Google blue */
+}
+
+input:focus + .toggle-slider {
+  box-shadow: 0 0 1px #4285f4;
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(26px);
+}
+
+/* Garantir que o container do toggle esteja alinhado corretamente */
+.voice-toggle-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  margin: 5px 0;
+}
+
+/* Adicionar um indicador visual de estado */
+.toggle-switch::after {
+  content: attr(data-state);
+  position: absolute;
+  right: -40px;
+  font-size: 11px;
+  color: #666;
+}
+
+input:checked ~ .toggle-switch::after {
+  content: "ON";
+}
+
+input:not(:checked) ~ .toggle-switch::after {
+  content: "OFF";
+}
+
+/* Melhorar o painel de configurações para comportamento responsivo */
+.config-panel {
+  max-height: calc(90vh - 100px);
+  overflow-y: auto;
+  padding-bottom: 15px;
+}

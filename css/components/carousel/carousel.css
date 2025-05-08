@@ -45,7 +45,7 @@
   width: 100% !important; /* Garantir largura completa */
   box-sizing: border-box !important;
   position: relative !important;
-  z-index: 1 !important;
+  z-index: 5 !important;
 }
 
 /* Garantir que apenas um slide seja exibido por vez */
@@ -308,10 +308,11 @@
 #assistant-messages .swiper-slide img {
   display: block !important;
   width: 100% !important;
-  height: auto !important;
+  height: 100%;
   object-fit: cover !important;
   min-height: 220px !important;
-  max-height: 65vh !important;
+  max-height: 95vh !important;
+  z-index: 5;
   opacity: 0; /* Inicialmente invisível */
   transition: opacity 0.3s ease !important;
 }
@@ -324,7 +325,7 @@
 #assistant-messages .carousel-info-text {
   width: 100% !important;
   box-sizing: border-box !important;
-  padding: 8px !important;
+  padding: 1px !important;
   font-size: 14px !important;
   text-align: center !important;
   background-color: var(--gray-50) !important;
@@ -355,7 +356,7 @@
   width: 100% !important;
   height: auto !important; /* Altura automática baseada no conteúdo */
   min-height: 220px !important; /* Altura mínima para garantir visibilidade */
-  max-height: 55vh !important; /* Altura máxima para telas grandes */
+  max-height: 85vh !important; /* Altura máxima para telas grandes */
   overflow: hidden !important;
   flex: 1 !important; /* Permitir que cresça para preencher o espaço */
 }

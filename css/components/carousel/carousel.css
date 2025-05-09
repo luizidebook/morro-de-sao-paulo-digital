@@ -495,7 +495,7 @@
 
 .carousel-minimize-button {
   background-color: transparent; /* Sem background */
-  color: white;
+  color: #0043b3;
   border: none;
   border-radius: 50%;
   width: 30px;
@@ -507,11 +507,12 @@
   cursor: pointer;
   transition: transform 0.2s ease, color 0.2s ease;
   outline: none;
+  font-weight: bold;
   text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Texto mais destacado sem background */
 }
 
 .carousel-minimize-button:hover {
-  color: rgba(255, 255, 255, 0.9);
+  color: #0043b3;
 }
 
 .carousel-minimize-button:active {

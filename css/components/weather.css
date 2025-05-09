@@ -12,7 +12,7 @@
   height: 6.875rem; /* 110px */
   font-size: var(--font-size-xs); /* Era 10px */
   color: var(--gray-800);
-  transition: box-shadow 0.2s, transform 0.2s;
+  transition: box-shadow 0.1s, transform 0.1s;
   overflow: hidden;
   display: flex;
   flex-direction: column; /* Alterado para coluna */
@@ -99,7 +99,7 @@
   flex-shrink: 0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   box-sizing: border-box;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.1s;
 }
 
 .weather-forecast-modal[data-scrolled="true"] .forecast-header {
@@ -127,7 +127,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s;
+  transition: background-color 0.1s;
 }
 
 .forecast-close-btn:hover {

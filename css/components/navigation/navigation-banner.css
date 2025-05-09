@@ -189,6 +189,7 @@
 }
 
 /* Barra de progresso da rota */
+/* Estilos aprimorados para barra de progresso */
 .progress-container {
   position: relative;
   height: 4px;
@@ -205,7 +206,36 @@
   left: 0;
   height: 100%;
   background: var(--accent-color);
-  transition: width 0.5s ease;
+  transition: width 0.5s ease-out; /* Transição mais suave */
+  border-radius: 2px;
+  min-width: 2px; /* Garantir visibilidade mesmo em 0% */
+}
+
+/* Classes para diferentes estados de progresso */
+.progress-bar.half-complete {
+  background: linear-gradient(90deg, var(--accent-color), #66c2ff);
+}
+
+.progress-bar.almost-complete {
+  background: linear-gradient(90deg, #66c2ff, #00cc66);
+  box-shadow: 0 0 5px rgba(0, 204, 102, 0.5);
+}
+
+/* Animação de pulsação para barra quase completa */
+@media (prefers-reduced-motion: no-preference) {
+  .progress-bar.almost-complete {
+    animation: progress-pulse 1.5s infinite;
+  }
+
+  @keyframes progress-pulse {
+    0%,
+    100% {
+      opacity: 0.9;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
 }
 
 /* Quando minimizado */
@@ -520,4 +550,42 @@
   100% {
     box-shadow: 0 0 0 rgba(255, 51, 0, 0.6);
   }
+}
+
+/* Adicione ao final do arquivo */
+
+/* Estilos para reposicionamento de elementos durante navegação */
+.weather-widget.shifted-for-navigation {
+  transition: top 0.3s ease;
+}
+
+.leaflet-top.shifted-for-navigation {
+  transition: top 0.3s ease;
+}
+
+/* Ajustes responsivos para dispositivos menores */
+@media (max-width: 768px) {
+  .instruction-banner {
+    max-width: 100%;
+    border-radius: 0;
+  }
+
+  /* Quando em navegação, mover weather widget para outro local em telas pequenas */
+  .weather-widget.shifted-for-navigation {
+    right: 10px;
+    top: auto !important;
+    bottom: 120px; /* Manter acima dos controles de navegação */
+    z-index: 2150; /* Garantir que fique acima de outros elementos */
+  }
+}
+
+/* Design mais compacto para o widget de clima em navegação */
+.navigation-active .weather-widget {
+  width: 4rem; /* Reduzir largura */
+  height: 5.5rem; /* Reduzir altura */
+  padding: 4px;
+}
+
+.navigation-active .weather-widget .weather-emoji {
+  font-size: 2em; /* Reduzir tamanho do emoji */
 }

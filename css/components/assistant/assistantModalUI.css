@@ -25,7 +25,7 @@
   top: 40%;
   transform: translateX(-50%);
   z-index: var(--z-overlay, 1000);
-
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   /* Dimensões */
   width: auto;
   max-width: 150vh;
@@ -166,7 +166,6 @@
   position: relative;
   font-size: var(--font-size-base, 1rem);
   box-sizing: border-box;
-  margin-bottom: var(--spacing-sm, 0.5rem);
   border-radius: 1rem;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
   transition: transform 0.2s ease;
@@ -227,6 +226,7 @@
   max-height: 80vh;
   height: auto;
   z-index: 1000;
+  top: 30%;
 }
 
 #assistant-messages.showing-carousel .carousel-container {
@@ -291,9 +291,9 @@
 /* Botão de minimizar */
 #assistant-messages .minimize-button {
   position: absolute;
-  top: 1px;
-  right: 0px;
-  left: auto;
+  /* top: 1px; */
+  /* right: 0px; */
+  left: 87%;
   border: none;
   font-size: 1.5rem;
   font-weight: bold;
@@ -303,9 +303,10 @@
   height: 2.75rem;
   display: flex;
   z-index: 2;
-  justify-content: center;
-  align-items: center;
   padding: 0;
+  flex-direction: column-reverse;
+  margin-left: 4px;
+  justify-content: flex-end;
 }
 
 #assistant-messages .minimize-button:hover {
@@ -524,7 +525,7 @@ body.dark-theme #assistant-messages .message.user,
 /* Telas pequenas (smartphones) */
 @media (max-width: 480px) {
   #assistant-messages {
-    min-width: 90%;
+    min-width: 70%;
     max-width: 95%;
     max-height: 70vh;
     top: 40%;
@@ -602,4 +603,19 @@ body.dark-theme #assistant-messages .message.user,
   border-radius: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Adicionar ao final do arquivo */
+/* Garantir que não haja restrições de altura */
+#assistant-messages.repositioned {
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+}
+
+#assistant-messages.repositioned .messages-area {
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  overflow-y: visible !important;
 }

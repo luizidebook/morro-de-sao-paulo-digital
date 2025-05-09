@@ -58,3 +58,25 @@
   -moz-user-drag: none;
   -ms-user-drag: none;
 }
+
+/* Adicionar ao seu arquivo CSS ou incluir no head */
+.map-rotated .leaflet-marker-icon:not(.user-location-marker) {
+  /* Rotacionar marcadores normais para ficarem legíveis */
+  transform: rotate(-180deg);
+}
+
+.map-rotated .leaflet-popup-content {
+  /* Corrigir orientação dos popups */
+  transform: rotate(-180deg);
+}
+
+.map-rotated .leaflet-control-zoom a,
+.map-rotated .leaflet-control-attribution {
+  /* Corrigir orientação dos controles de zoom */
+  transform: rotate(-180deg);
+}
+
+/* Manter o marcador do usuário com orientação normal */
+.map-rotated .user-location-marker {
+  transform: none !important;
+}

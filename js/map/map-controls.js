@@ -14,6 +14,8 @@ import {
 import { animateMapToLocalizationUser } from "../navigation/navigationUserLocation/user-location.js";
 import { updateUserMarker } from "../navigation/navigationUserLocation/user-location.js";
 import { setLastRouteData } from "../navigation/navigationState/navigationStateManager.js";
+import { dispatchActionEvent } from "../utils/ui-position.js";
+import { repositionMessagesArea } from "../utils/ui-position.js";
 /* O que esse módulo cobre:
 Inicializa o mapa OpenStreetMap com Leaflet.
 Centraliza o mapa em Morro de São Paulo.
@@ -401,6 +403,8 @@ export function showLocationOnMap(locationName, lat, lon) {
   }
 
   clearMarkers();
+  // Inicializar gerenciador de posicionamento de mensagens
+  repositionMessagesArea(true);
 
   if (!lat || !lon) {
     console.warn(
@@ -438,6 +442,8 @@ export function showLocationOnMap(locationName, lat, lon) {
  */
 export function showAllLocationsOnMap(locations) {
   clearMarkers();
+  // Inicializar gerenciador de posicionamento de mensagens
+  repositionMessagesArea(true);
 
   if (!locations || locations.length === 0) {
     console.warn("Nenhuma localização encontrada para exibir.");
@@ -792,7 +798,8 @@ export function setupGeolocation(map) {
 export async function showRoute(destination) {
   try {
     console.log("[showRoute] Iniciando exibição de rota para:", destination);
-
+    // Reposicionar área de mensagens próxima ao mood icon
+    repositionMessagesArea(true);
     if (!destination || !destination.lat || !destination.lon) {
       console.warn("[showRoute] destino inválido:", destination);
       showNotification("Selecione um destino válido.", "error");
@@ -803,6 +810,8 @@ export async function showRoute(destination) {
       );
       return;
     }
+    // Disparar evento para notificar o gerenciador de posicionamento
+    dispatchActionEvent("showRoute");
 
     const destinationLat = destination.lat;
     const destinationLon = destination.lon;
@@ -2101,17 +2110,18 @@ export function getPreciseLocationRealtime(
  * Versão robusta que garante que o marcador sempre aponte na direção correta
  * @param {Object} userPos - Posição do usuário: {latitude, longitude}
  * @param {Array} routePoints - Pontos da rota
+ * @returns {number|null} - O ângulo calculado ou null em caso de erro
  */
 export function updateUserMarkerDirection(userPos, routePoints) {
   // Verificações de validade robustas
   if (!userPos || !userPos.latitude || !userPos.longitude) {
     console.warn("[updateUserMarkerDirection] Posição do usuário inválida");
-    return;
+    return null;
   }
 
   if (!routePoints || !Array.isArray(routePoints) || routePoints.length < 2) {
     console.warn("[updateUserMarkerDirection] Pontos de rota inválidos");
-    return;
+    return null;
   }
 
   try {
@@ -2201,22 +2211,61 @@ export function updateUserMarkerDirection(userPos, routePoints) {
         }
       );
 
-      // Atualizar o marcador do usuário com o ângulo calculado
-      updateUserMarker(
-        userPos.latitude,
-        userPos.longitude,
-        bearing, // Usar o ângulo calculado, não o heading do dispositivo
-        userPos.accuracy || 15
-      );
+      // Após calcular o bearing, aplicar ao marcador
+      if (window.userMarker) {
+        // Usar apenas o ângulo calculado, ignorando qualquer heading do dispositivo
+        updateUserMarker(
+          userPos.latitude,
+          userPos.longitude,
+          bearing, // Usar apenas o ângulo para o próximo ponto
+          userPos.accuracy || 15
+        );
 
-      return bearing;
+        // Armazenar a direção atual para referência
+        if (window.navigationState) {
+          window.navigationState.currentMarkerDirection = bearing;
+        }
+
+        // Adicionar classe para identificar que o marcador está usando direção fixa
+        if (window.userMarker._icon) {
+          window.userMarker._icon.classList.add("fixed-direction");
+
+          // Remover qualquer classe de transição anterior
+          window.userMarker._icon.classList.remove("direction-transition");
+
+          // Adicionar transição suave para mudanças de orientação
+          setTimeout(() => {
+            if (window.userMarker && window.userMarker._icon) {
+              window.userMarker._icon.classList.add("direction-transition");
+            }
+          }, 50);
+        }
+
+        // Também armazenar o valor do bearing para uso em outras funções
+        if (window.navigationState) {
+          window.navigationState.calculatedBearing = bearing;
+
+          // Armazenar os índices dos pontos para referência
+          window.navigationState.currentRoutePointIndex = nearestPointIndex;
+          window.navigationState.nextRoutePointIndex = nextPointIndex;
+        }
+
+        return bearing;
+      } else {
+        console.warn(
+          "[updateUserMarkerDirection] Marcador do usuário não encontrado"
+        );
+        return bearing; // Retornar o ângulo mesmo assim para uso em outros contextos
+      }
     } else {
       console.warn(
         "[updateUserMarkerDirection] Não foi possível encontrar próximo ponto válido na rota"
       );
+      return null;
     }
   } catch (error) {
     console.error("[updateUserMarkerDirection] Erro:", error);
+    return null;
   }
 }
 

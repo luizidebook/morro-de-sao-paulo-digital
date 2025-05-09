@@ -6,7 +6,7 @@ export const UI_CONFIG = {
     INSTRUCTION_DETAILS: "instruction-details",
     INSTRUCTION_DISTANCE: "instruction-distance",
     INSTRUCTION_TIME: "instruction-time",
-    MINIMIZE_BUTTON: "minimize-navigation-btn", // Garantir que o ID correto seja usado
+    MINIMIZE_BUTTON: "minimize-navigation-btn", // ID consistente
   },
   CLASSES: {
     HIDDEN: "hidden",

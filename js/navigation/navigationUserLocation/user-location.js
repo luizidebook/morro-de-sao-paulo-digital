@@ -8,8 +8,15 @@ import {
   appendMessage,
   messages,
 } from "../../assistant/assistant-messages/assistant-messages.js";
-
-import { isValidCoordinate } from "../navigationUtils/distanceCalculator.js";
+// Adicionar importações no início dos arquivos que precisam da geolocalização avançada
+import {
+  getCurrentLocation,
+  startLocationTracking,
+  stopLocationTracking,
+  requestLocationPermission,
+  getBestEffortLocation,
+  isValidCoordinate,
+} from "../navigationUserLocation/enhanced-geolocation.js";
 import { apiKey } from "../../map/mapManager.js";
 import { map } from "../../map/map-controls.js";
 import { navigationState } from "../navigationState/navigationStateManager.js";
@@ -100,58 +107,37 @@ function ensureNavigationStyles() {
 /**
  * Obtém a localização atual do usuário uma única vez e inicia o tracking contínuo.
  * Sempre orienta o usuário sobre o que está acontecendo.
- * Versão melhorada com maior tolerância a precisão e melhor feedback.
+ * Versão melhorada usando o sistema avançado de geolocalização.
  */
 export async function getCurrentPosition(
   options = {
     enableHighAccuracy: true,
-    timeout: 20000, // Aumentado para 20 segundos
+    timeout: 20000,
     maximumAge: 5000,
-    minAccuracy: 3000, // Novo: aceita precisão de até 3km
+    minAccuracy: 3000,
   }
 ) {
   appendMessage("assistant", messages.userLocation.locating(), {
     speakMessage: true,
   });
 
-  if (!("geolocation" in navigator)) {
-    appendMessage("assistant", messages.userLocation.permissionNeeded(), {
-      speakMessage: true,
-    });
-    return null;
-  }
+  // Adiciona indicador visual de carregamento
+  const loadingIndicator = document.createElement("div");
+  loadingIndicator.className = "location-loading-indicator";
+  loadingIndicator.innerHTML =
+    '<i class="fas fa-location-arrow fa-spin"></i> Obtendo localização...';
+  document.body.appendChild(loadingIndicator);
+
+  // Inicia o relógio para medição de tempo de resposta
+  const startTime = Date.now();
 
   try {
-    // Adiciona indicador visual de carregamento
-    const loadingIndicator = document.createElement("div");
-    loadingIndicator.className = "location-loading-indicator";
-    loadingIndicator.innerHTML =
-      '<i class="fas fa-location-arrow fa-spin"></i> Obtendo localização...';
-    document.body.appendChild(loadingIndicator);
-
-    // Inicia o relógio para medição de tempo de resposta
-    const startTime = Date.now();
-
-    const position = await new Promise((resolve, reject) => {
-      const geolocationTimeout = setTimeout(() => {
-        reject(new Error("Tempo de espera para localização excedido."));
-      }, options.timeout);
-
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          clearTimeout(geolocationTimeout);
-          resolve(pos);
-        },
-        (err) => {
-          clearTimeout(geolocationTimeout);
-          reject(err);
-        },
-        {
-          enableHighAccuracy: options.enableHighAccuracy,
-          timeout: options.timeout * 0.9, // 90% do timeout para garantir que nosso próprio timeout dispare primeiro
-          maximumAge: options.maximumAge,
-        }
-      );
+    // Usar a versão avançada do módulo enhanced-geolocation
+    const position = await getCurrentLocation({
+      enableHighAccuracy: options.enableHighAccuracy !== false,
+      timeout: options.timeout || 20000,
+      maximumAge: options.maximumAge || 5000,
+      desiredAccuracy: options.minAccuracy || 3000,
     });
 
     // Remove o indicador visual
@@ -159,7 +145,22 @@ export async function getCurrentPosition(
       document.body.removeChild(loadingIndicator);
     }
 
-    const { latitude, longitude, accuracy } = position.coords;
+    if (!position) {
+      appendMessage("assistant", messages.userLocation.error(), {
+        speakMessage: true,
+      });
+      return null;
+    }
+
+    const {
+      latitude,
+      longitude,
+      accuracy,
+      altitude,
+      altitudeAccuracy,
+      heading,
+      speed,
+    } = position;
     const elapsedTime = Date.now() - startTime;
     markLocationAsShared();
 
@@ -170,18 +171,25 @@ export async function getCurrentPosition(
         lat: latitude,
         lon: longitude,
         accuracy: accuracy,
+        heading: heading,
+        speed: speed,
         timestamp: new Date().toISOString(),
       }
     );
 
-    // Atualizar objeto de localização e contexto
+    // Atualizar objeto de localização e contexto com todos os dados disponíveis
     userLocation = {
       latitude,
       longitude,
       accuracy,
-      timestamp: Date.now(),
+      altitude,
+      altitudeAccuracy,
+      heading: heading || 0,
+      speed: speed || 0,
+      timestamp: position.timestamp || Date.now(),
       responseTime: elapsedTime,
     };
+
     updateContext({ userLocation });
 
     // Feedback visual mais preciso com base na qualidade da localização
@@ -211,18 +219,17 @@ export async function getCurrentPosition(
     appendMessage("assistant", qualityMessage, { speakMessage: true });
     showNotification(qualityMessage, messageType);
 
-    // Inicia o rastreamento contínuo
+    // Inicia o rastreamento contínuo com o sistema avançado
     startUserTracking();
 
-    // Opcional: centraliza o mapa na localização do usuário
+    // Centraliza o mapa na localização do usuário
     try {
       if (typeof animateMapToLocalizationUser === "function") {
         animateMapToLocalizationUser(latitude, longitude);
       }
 
-      if (typeof updateUserMarker === "function") {
-        updateUserMarker(latitude, longitude, 0, accuracy);
-      }
+      // Atualizar marcador com todos os dados disponíveis
+      updateUserMarker(latitude, longitude, heading || 0, accuracy || 15);
     } catch (mapError) {
       console.warn("[getCurrentPosition] Erro ao centralizar mapa:", mapError);
     }
@@ -248,10 +255,7 @@ export async function getCurrentPosition(
     console.error("[getCurrentPosition] Erro:", error);
 
     // Remove o indicador visual se ainda existir
-    const loadingIndicator = document.querySelector(
-      ".location-loading-indicator"
-    );
-    if (loadingIndicator) {
+    if (document.body.contains(loadingIndicator)) {
       document.body.removeChild(loadingIndicator);
     }
 
@@ -271,7 +275,7 @@ export async function getCurrentPosition(
     } else if (error.code === 3) {
       // TIMEOUT
       additionalMessage =
-        "Tempo esgotado para obter localização. Tente novamente em um local com melhor sinal de GPS.";
+        "Tempo esgotado ao obter localização. Tente novamente em um local com melhor sinal de GPS.";
     }
 
     appendMessage("assistant", message, { speakMessage: true });
@@ -286,187 +290,54 @@ export async function getCurrentPosition(
       { speakMessage: true }
     );
 
+    // Tentar obter localização aproximada como último recurso
+    try {
+      const fallbackPosition = await getBestEffortLocation(30000);
+
+      if (fallbackPosition) {
+        console.log(
+          "[getCurrentPosition] Usando posição de fallback:",
+          fallbackPosition
+        );
+
+        userLocation = {
+          ...fallbackPosition,
+          isFallback: true,
+          timestamp: Date.now(),
+        };
+
+        updateContext({ userLocation });
+
+        appendMessage(
+          "assistant",
+          `Consegui encontrar uma localização aproximada com precisão de ${Math.round(
+            fallbackPosition.accuracy
+          )}m.`,
+          { speakMessage: true }
+        );
+
+        updateUserMarker(
+          fallbackPosition.latitude,
+          fallbackPosition.longitude,
+          fallbackPosition.heading || 0,
+          fallbackPosition.accuracy || 1000
+        );
+
+        showNotification("Localização aproximada encontrada", "info");
+        return userLocation;
+      }
+    } catch (fallbackError) {
+      console.warn(
+        "[getCurrentPosition] Erro ao obter posição de fallback:",
+        fallbackError
+      );
+    }
+
     showNotification("Não foi possível obter sua localização", "error");
     updateContext({ userLocation: null });
     return null;
   }
 }
-
-/**
- * Inicia o monitoramento contínuo da posição do usuário
- */
-export function startPositionTracking() {
-  // Limpar watch position anterior se existir
-  if (positionWatcherId !== null) {
-    navigator.geolocation.clearWatch(positionWatcherId);
-  }
-
-  // Tentar obter posição inicial antes de iniciar tracking
-  getEnhancedPosition()
-    .then((initialPosition) => {
-      // Atualizar marcador com posição inicial
-      updateUserMarker(
-        initialPosition.coords.latitude,
-        initialPosition.coords.longitude,
-        initialPosition.coords.heading || 0,
-        initialPosition.coords.accuracy
-      );
-
-      // Continuar com o tracking normal
-      positionWatcherId = navigator.geolocation.watchPosition(
-        (position) => {
-          const { latitude, longitude, accuracy, heading, speed } =
-            position.coords;
-
-          // Atualizar dados do usuário
-          const userPos = {
-            latitude,
-            longitude,
-            accuracy,
-            heading: heading || 0,
-            speed: speed || 0,
-          };
-
-          // Atualizar o objeto global userLocation
-          if (window.userLocation) {
-            window.userLocation.latitude = latitude;
-            window.userLocation.longitude = longitude;
-            window.userLocation.accuracy = accuracy;
-            window.userLocation.heading = heading;
-            window.userLocation.speed = speed;
-          }
-
-          // Atualiza o marcador do usuário
-          updateUserMarker(latitude, longitude, heading, accuracy);
-
-          // Atualiza a rotação do mapa se tiver heading e rotação estiver ativada
-          if (
-            navigationState.isRotationEnabled &&
-            heading !== null &&
-            heading !== undefined
-          ) {
-            setMapRotation(heading);
-          }
-
-          // Verifica se o usuário chegou ao destino
-          checkDestinationArrival(latitude, longitude);
-
-          // Atualiza a navegação em tempo real
-          updateRealTimeNavigation(userPos);
-
-          // Verificar se o usuário se desviou da rota
-          if (shouldRecalculateRoute(latitude, longitude)) {
-            // Evitar recálculos em cascata
-            if (!recalculationInProgress) {
-              notifyDeviation(true);
-              recalculateRoute(
-                latitude,
-                longitude,
-                navigationState.selectedDestination.lat,
-                navigationState.selectedDestination.lon,
-                {
-                  lang: navigationState.lang,
-                  bigDeviation: true,
-                  profile: "foot-walking",
-                }
-              );
-            }
-          }
-        },
-        (error) => {
-          console.error("[startPositionTracking] Erro:", error);
-          showNotification(
-            getGeneralText("location_error", navigationState.lang),
-            "error"
-          );
-        },
-        { enableHighAccuracy: true, maximumAge: 3000 }
-      );
-
-      console.log("[startPositionTracking] Monitoramento de posição iniciado");
-    })
-    .catch((error) => {
-      console.error(
-        "[startPositionTracking] Erro ao obter posição inicial:",
-        error
-      );
-      // Continuar com tracking normal mesmo com erro
-      positionWatcherId = navigator.geolocation.watchPosition(
-        (position) => {
-          const { latitude, longitude, accuracy, heading, speed } =
-            position.coords;
-
-          // Atualizar dados do usuário
-          const userPos = {
-            latitude,
-            longitude,
-            accuracy,
-            heading: heading || 0,
-            speed: speed || 0,
-          };
-
-          // Atualizar o objeto global userLocation
-          if (window.userLocation) {
-            window.userLocation.latitude = latitude;
-            window.userLocation.longitude = longitude;
-            window.userLocation.accuracy = accuracy;
-            window.userLocation.heading = heading;
-            window.userLocation.speed = speed;
-          }
-
-          // Atualiza o marcador do usuário
-          updateUserMarker(latitude, longitude, heading, accuracy);
-
-          // Atualiza a rotação do mapa se tiver heading e rotação estiver ativada
-          if (
-            navigationState.isRotationEnabled &&
-            heading !== null &&
-            heading !== undefined
-          ) {
-            setMapRotation(heading);
-          }
-
-          // Verifica se o usuário chegou ao destino
-          checkDestinationArrival(latitude, longitude);
-
-          // Atualiza a navegação em tempo real
-          updateRealTimeNavigation(userPos);
-
-          // Verificar se o usuário se desviou da rota
-          if (shouldRecalculateRoute(latitude, longitude)) {
-            // Evitar recálculos em cascata
-            if (!recalculationInProgress) {
-              notifyDeviation(true);
-              recalculateRoute(
-                latitude,
-                longitude,
-                navigationState.selectedDestination.lat,
-                navigationState.selectedDestination.lon,
-                {
-                  lang: navigationState.lang,
-                  bigDeviation: true,
-                  profile: "foot-walking",
-                }
-              );
-            }
-          }
-        },
-        (error) => {
-          console.error("[startPositionTracking] Erro:", error);
-          showNotification(
-            getGeneralText("location_error", navigationState.lang),
-            "error"
-          );
-        },
-        { enableHighAccuracy: true, maximumAge: 3000 }
-      );
-
-      console.log("[startPositionTracking] Monitoramento de posição iniciado");
-    });
-
-  return positionWatcherId;
-}
-
 /**
  * Ativa o rastreamento contínuo do usuário.
  */
@@ -474,40 +345,118 @@ export function startUserTracking() {
   trackingActive = true;
   startPositionTracking();
 }
-/**
- * Para o rastreamento contínuo da posição do usuário.
- * Esta função cancela o watchPosition atual e limpa recursos associados.
- * @returns {boolean} - Se o rastreamento foi parado com sucesso
- */
+
+export function startPositionTracking() {
+  // Limpar rastreamento anterior
+  if (positionWatcherId !== null) {
+    stopLocationTracking();
+  }
+
+  // Iniciar rastreamento com enhanced-geolocation
+  positionWatcherId = startLocationTracking(
+    // Callback de sucesso
+    (position) => {
+      const { latitude, longitude, accuracy, heading, speed } = position;
+
+      // Atualizar dados do usuário
+      const userPos = {
+        latitude,
+        longitude,
+        accuracy,
+        heading: heading || 0,
+        speed: speed || 0,
+        timestamp: Date.now(),
+      };
+
+      // Armazenar última posição válida
+      window.lastValidPosition = { ...userPos };
+
+      // Atualizar objeto global userLocation
+      userLocation = userPos;
+      window.userLocation = userPos;
+
+      // Atualizar marcador com orientação apropriada
+      if (window.navigationState && window.navigationState.isActive) {
+        // Usar direção calculada quando em navegação ativa
+        if (window.navigationState.calculatedBearing !== undefined) {
+          updateUserMarker(
+            latitude,
+            longitude,
+            window.navigationState.calculatedBearing,
+            accuracy
+          );
+        } else {
+          updateUserMarker(latitude, longitude, null, accuracy);
+        }
+      } else {
+        // Modo normal - usar heading do dispositivo
+        updateUserMarker(latitude, longitude, heading, accuracy);
+
+        // Rotação do mapa se ativada
+        if (
+          heading !== null &&
+          heading !== undefined &&
+          window.navigationState &&
+          window.navigationState.isRotationEnabled
+        ) {
+          if (typeof setMapRotation === "function") {
+            setMapRotation(heading);
+          }
+        }
+      }
+
+      // Verificar chegada e atualização em tempo real
+      if (typeof checkDestinationArrival === "function") {
+        checkDestinationArrival(latitude, longitude);
+      }
+
+      if (typeof updateRealTimeNavigation === "function") {
+        updateRealTimeNavigation(userPos);
+      }
+    },
+
+    // Callback de erro
+    (error) => {
+      console.warn("[startPositionTracking] Erro:", error);
+
+      // Notificar apenas erros de permissão
+      if (error.code === 1) {
+        const message =
+          "Permissão de localização negada. Verifique as configurações do navegador.";
+
+        if (typeof showNotification === "function") {
+          showNotification(message, "warning");
+        }
+      }
+    },
+
+    // Opções
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 3000,
+      useAllSensors: true,
+      persistentTracking: true,
+      retryAttempts: 3,
+    }
+  );
+
+  return positionWatcherId;
+}
 export function stopPositionTracking() {
   console.log("[user-location] Parando rastreamento de posição");
 
   try {
-    // Limpar o watchId atual se existir
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
-      console.log("[user-location] Watch de posição cancelado");
-    }
+    // Usar função do enhanced-geolocation
+    stopLocationTracking();
+    positionWatcherId = null;
 
     // Atualizar estado de rastreamento
     trackingActive = false;
 
     // Atualizar contexto se a função existir
-    try {
-      if (typeof updateContext === "function") {
-        updateContext({ isTrackingActive: false });
-      }
-    } catch (contextError) {
-      console.warn(
-        "[stopPositionTracking] Erro ao atualizar contexto:",
-        contextError
-      );
-    }
-
-    // Opcional: Mostrar notificação
-    if (typeof showNotification === "function") {
-      showNotification("Rastreamento de posição desativado", "info");
+    if (typeof updateContext === "function") {
+      updateContext({ locationTracking: false });
     }
 
     return true;
@@ -747,184 +696,6 @@ export function markLocationAsShared() {
 }
 
 /**
- * Obtém a melhor localização possível dentro do tempo especificado.
- * Versão otimizada e com cache.
- * @param {number} maxWaitMs - Tempo máximo de espera
- * @param {number} desiredAccuracy - Precisão desejada em metros
- * @returns {Promise<{ latitude, longitude, accuracy }>}}
- */
-export function getBestEffortLocation(
-  maxWaitMs = 15000, // Reduzido para 15 segundos
-  desiredAccuracy = 200 // Mais permissivo: 200m
-) {
-  // Verificar cache recente (últimos 60 segundos)
-  if (
-    userLocation &&
-    userLocation.timestamp &&
-    Date.now() - userLocation.timestamp < 60000
-  ) {
-    console.log(
-      "[getBestEffortLocation] Usando localização em cache:",
-      userLocation
-    );
-    return Promise.resolve(userLocation);
-  }
-
-  return new Promise((resolve, reject) => {
-    let bestLocation = null;
-    let bestAccuracy = Infinity;
-    let finished = false;
-    let watchId = null;
-    let timeoutTriggered = false;
-
-    // Aceitar qualquer localização após 5 segundos, mesmo que não atinja a precisão desejada
-    const fallbackTimer = setTimeout(() => {
-      timeoutTriggered = true;
-      if (!finished && bestLocation) {
-        console.log(
-          "[getBestEffortLocation] Aceitando melhor localização disponível após timeout parcial"
-        );
-        finish(true);
-      }
-    }, Math.min(5000, maxWaitMs * 0.6));
-
-    function finish(acceptAnyAccuracy = false) {
-      if (finished) return;
-      finished = true;
-
-      clearTimeout(fallbackTimer);
-
-      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-
-      if (window.precisionCircle && map)
-        map.removeLayer(window.precisionCircle);
-
-      if (bestLocation) {
-        // Adicionar timestamp
-        bestLocation.timestamp = Date.now();
-
-        if (acceptAnyAccuracy || bestLocation.accuracy <= desiredAccuracy) {
-          showNotification(
-            `Localização obtida com precisão de ${Math.round(
-              bestLocation.accuracy
-            )}m.`,
-            bestLocation.accuracy <= desiredAccuracy ? "success" : "warning"
-          );
-
-          // Registrar que o usuário compartilhou localização
-          localStorage.setItem("location-permission-granted", "true");
-
-          resolve(bestLocation);
-        } else {
-          showNotification(
-            `Localização obtida, mas com precisão limitada (${Math.round(
-              bestLocation.accuracy
-            )}m).`,
-            "warning"
-          );
-          resolve(bestLocation); // Aceitar mesmo com precisão ruim
-        }
-      } else {
-        showNotification("Não foi possível obter sua localização.", "error");
-        reject(new Error("Não foi possível obter localização."));
-      }
-    }
-
-    // Usar getCurrentPosition primeiro para uma resposta mais rápida
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        if (finished) return;
-
-        const { latitude, longitude, accuracy } = position.coords;
-        console.log(
-          `[getBestEffortLocation] Posição inicial: (${latitude}, ${longitude}), precisão: ${accuracy}m`
-        );
-
-        bestLocation = { latitude, longitude, accuracy };
-
-        if (accuracy <= desiredAccuracy) {
-          finish();
-        }
-      },
-      (error) => {
-        console.warn(
-          "[getBestEffortLocation] Erro em getCurrentPosition:",
-          error
-        );
-        // Continua para watchPosition como fallback
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: maxWaitMs * 0.5,
-        maximumAge: 5000, // Permite usar posições mais antigas para resposta rápida
-      }
-    );
-
-    watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        console.log(
-          `[getBestEffortLocation] Recebido: (${latitude}, ${longitude}), precisão: ${accuracy}m`
-        );
-
-        if (accuracy < bestAccuracy) {
-          bestAccuracy = accuracy;
-          bestLocation = { latitude, longitude, accuracy };
-
-          // Mostra círculo de precisão no mapa
-          if (map) {
-            if (window.precisionCircle) map.removeLayer(window.precisionCircle);
-            window.precisionCircle = L.circle([latitude, longitude], {
-              radius: accuracy,
-              color: "#3b82f6",
-              fillColor: "#3b82f6",
-              fillOpacity: 0.15,
-            }).addTo(map);
-            map.setView([latitude, longitude], 16);
-          }
-        }
-
-        // Aceita quando atingir a precisão desejada
-        if (accuracy <= desiredAccuracy) {
-          finish();
-        }
-        // Se timeout parcial já ocorreu, aceita qualquer melhoria
-        else if (timeoutTriggered && accuracy < bestAccuracy * 0.8) {
-          finish(true); // Aceita melhoria significativa mesmo sem atingir a precisão ideal
-        }
-      },
-      (error) => {
-        console.error(
-          "[getBestEffortLocation] Erro ao obter localização:",
-          error
-        );
-
-        if (bestLocation) {
-          finish(true); // Usa a melhor localização disponível em caso de erro
-        } else {
-          finish(); // Vai rejeitar a promise
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: maxWaitMs,
-        maximumAge: 0,
-      }
-    );
-
-    // Timeout final
-    setTimeout(() => {
-      if (!finished) {
-        console.log(
-          `[getBestEffortLocation] Timeout final após ${maxWaitMs}ms`
-        );
-        finish(true); // Aceita qualquer precisão no timeout final
-      }
-    }, maxWaitMs);
-  });
-}
-
-/**
  * Rastreia a localização do usuário em tempo real até atingir a precisão desejada.
  * Retorna um objeto Promise com método stop() para cancelar o rastreamento.
  * @param {number} desiredAccuracy - Precisão desejada em metros
@@ -1093,34 +864,6 @@ export function animateMapToLocalizationUser(
  * Atualiza ou cria o marcador do usuário
  */
 //
-/**
- * Atualiza ou cria o marcador do usuário como uma seta vermelha
- * @param {number} lat - Latitude do usuário
- * @param {number} lon - Longitude do usuário
- * @param {number} heading - Direção do movimento em graus (0-359)
- * @param {number} accuracy - Precisão da localização em metros
- */
-
-/**
- * Verifica se o plugin Leaflet.RotatedMarker está disponível
- * @returns {boolean} - true se o plugin estiver carregado
- */
-export function isRotatedMarkerPluginAvailable() {
-  return (
-    typeof L !== "undefined" &&
-    L.Marker &&
-    typeof L.Marker.prototype.setRotationAngle === "function"
-  );
-}
-
-/**
- * Updates the user marker position and rotation
- * @param {number} lat - User's latitude
- * @param {number} lon - User's longitude
- * @param {number} heading - Direction in degrees (0-359)
- * @param {number} accuracy - Position accuracy in meters
- * @returns {boolean} - Success status
- */
 export function updateUserMarker(lat, lon, heading = 0, accuracy = 15) {
   if (lat === undefined || lon === undefined || isNaN(lat) || isNaN(lon)) {
     console.error("[updateUserMarker] Invalid coordinates:", lat, lon);
@@ -1136,16 +879,48 @@ export function updateUserMarker(lat, lon, heading = 0, accuracy = 15) {
     // Update marker position
     window.userMarker.setLatLng([lat, lon]);
 
+    // VERIFICA se estamos em modo de navegação
+    const isNavigating =
+      window.navigationState && window.navigationState.isActive;
+
+    // Se estamos navegando e a direção não foi explicitamente definida pela função updateUserMarkerDirection,
+    // não atualizar a rotação (manter a última usada)
+    if (isNavigating && heading === window.userLocation?.heading) {
+      // Manter a direção anterior (foi chamado com o heading do dispositivo)
+      console.log(
+        "[updateUserMarker] Em navegação - mantendo direção para próximo passo"
+      );
+      return true;
+    }
+
     // Apply rotation if heading is valid
     if (typeof heading === "number" && !isNaN(heading)) {
-      // Important: Do NOT add 180 degrees here, as it's done in updateUserMarkerDirection
+      // Determinar se é uma mudança significativa de direção
+      const currentHeading = window.userMarker.options.rotationAngle || 0;
+      const headingDiff = Math.abs(
+        ((heading - currentHeading + 180) % 360) - 180
+      );
+
+      // Se a mudança for significativa, aplicar transição
+      if (headingDiff > 20) {
+        // Adicionar classe de transição para animação suave
+        if (window.userMarker._icon) {
+          window.userMarker._icon.classList.add("direction-transition");
+
+          // Remover classe após a animação
+          setTimeout(() => {
+            if (window.userMarker && window.userMarker._icon) {
+              window.userMarker._icon.classList.remove("direction-transition");
+            }
+          }, 600); // Duração da animação + um pouco
+        }
+      }
+
+      // Aplicar rotação usando plugin ou CSS
       if (typeof window.userMarker.setRotationAngle === "function") {
         window.userMarker.setRotationAngle(heading);
-        console.log(
-          `[updateUserMarker] Applying rotation: ${heading.toFixed(1)}°`
-        );
       } else {
-        // Fallback for when the rotation plugin isn't available
+        // Fallback para CSS quando o plugin não estiver disponível
         try {
           const markerElement = window.userMarker._icon;
           if (markerElement) {
@@ -1407,6 +1182,7 @@ function addUserPopupStyles() {
  * Adiciona os estilos CSS necessários para o marcador do usuário
  * Garante que os estilos são adicionados apenas uma vez
  */
+// Na função addUserMarkerStyles, adicionar:
 function addUserMarkerStyles() {
   if (document.getElementById("user-marker-style")) return;
 
@@ -1429,6 +1205,16 @@ function addUserMarkerStyles() {
     /* CORREÇÃO: Impedir que o marcador do usuário seja contra-rotacionado com os outros */
     .leaflet-map-rotated .user-location-marker {
       transform: none !important;
+    }
+    
+    /* NOVO: Para garantir que o marcador fique estável durante navegação */
+    .fixed-direction .user-location-arrow {
+      transition: transform 0.6s ease-in-out;
+    }
+    
+    /* Nova classe para transição durante mudanças de direção */
+    .direction-transition {
+      transition: transform 0.6s ease-in-out !important;
     }
     
     .gps-accuracy-circle {
@@ -2107,233 +1893,121 @@ export function getEnhancedPosition(options = {}) {
   });
 }
 
+// No arquivo navigationUserLocation/user-location.js
+// Melhore a função determineCurrentSegment para detectar melhor o segmento atual
+
+export function determineCurrentSegment(userLocation, instructions) {
+  if (
+    !instructions ||
+    !Array.isArray(instructions) ||
+    instructions.length === 0
+  ) {
+    return { segmentIndex: 0, distance: Infinity };
+  }
+
+  let closestSegmentIndex = 0;
+  let minDistance = Infinity;
+
+  // Encontrar o segmento mais próximo
+  instructions.forEach((instruction, index) => {
+    if (index < instructions.length - 1) {
+      const segLat = instruction.latitude || instruction.lat;
+      const segLon =
+        instruction.longitude || instruction.lon || instruction.lng;
+
+      if (segLat && segLon) {
+        const distance = calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          segLat,
+          segLon
+        );
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestSegmentIndex = index;
+        }
+      }
+    }
+  });
+
+  return { segmentIndex: closestSegmentIndex, distance: minDistance };
+}
 /**
- * Atualiza a direção do marcador do usuário para apontar para o próximo ponto da rota
- * @param {Object} userPos - Posição atual do usuário {latitude, longitude}
- * @param {Array} routePoints - Array de pontos da rota
- * @param {boolean} [debug=false] - Modo de depuração para logs detalhados
- * @returns {number|null} - Ângulo calculado ou null se falhar
+ * Calcula a direção fixa para um segmento específico da rota
+ * @param {number} segmentIndex - Índice do segmento atual nas instruções
+ * @param {Array} instructions - Array de instruções da rota
+ * @returns {number|null} Ângulo de direção ou null se não for possível calcular
  */
-export function updateUserMarkerDirection(userPos, routePoints, debug = false) {
-  try {
-    // Validar os dados de entrada
-    if (!userPos || !userPos.latitude || !userPos.longitude) {
-      console.warn("[updateUserMarkerDirection] Posição do usuário inválida");
-      return null;
-    }
+export function getSegmentDirection(segmentIndex, instructions) {
+  if (
+    !instructions ||
+    !Array.isArray(instructions) ||
+    instructions.length === 0
+  ) {
+    return null;
+  }
 
-    if (!routePoints || !Array.isArray(routePoints) || routePoints.length < 2) {
-      console.warn("[updateUserMarkerDirection] Pontos da rota inválidos");
-      return null;
-    }
+  // Obter o ponto atual
+  const currentInstruction = instructions[segmentIndex];
+  if (!currentInstruction) return null;
 
-    // 1. Encontrar o ponto mais próximo na rota
-    let minDistance = Infinity;
-    let nearestPointIndex = 0;
+  const currentLat = currentInstruction.latitude || currentInstruction.lat;
+  const currentLon =
+    currentInstruction.longitude ||
+    currentInstruction.lon ||
+    currentInstruction.lng;
 
-    for (let i = 0; i < routePoints.length; i++) {
-      const point = routePoints[i];
+  if (isNaN(currentLat) || isNaN(currentLon)) return null;
 
-      // Normalizar coordenadas do ponto (diferentes formatos possíveis)
-      const pointLat =
-        typeof point === "object"
-          ? point.lat ||
-            point.latitude ||
-            (Array.isArray(point) ? point[0] : null)
-          : Array.isArray(routePoints[i])
-          ? routePoints[i][0]
-          : null;
+  // Determinar o próximo ponto para calcular a direção
+  let nextInstruction;
+  let nextLat, nextLon;
 
-      const pointLon =
-        typeof point === "object"
-          ? point.lng ||
-            point.lon ||
-            point.longitude ||
-            (Array.isArray(point) ? point[1] : null)
-          : Array.isArray(routePoints[i])
-          ? routePoints[i][1]
-          : null;
+  // Se já estamos no último ponto da rota, usar direção do segmento anterior
+  if (segmentIndex >= instructions.length - 1) {
+    if (segmentIndex === 0) return 0; // Se só tiver um ponto, direção padrão
 
-      if (pointLat === null || pointLon === null) continue;
+    // Usar ponto anterior para calcular direção (invertendo-a)
+    const prevInstruction = instructions[segmentIndex - 1];
+    const prevLat = prevInstruction.latitude || prevInstruction.lat;
+    const prevLon =
+      prevInstruction.longitude || prevInstruction.lon || prevInstruction.lng;
 
-      const distance = calculateDistance(
-        userPos.latitude,
-        userPos.longitude,
-        pointLat,
-        pointLon
+    if (!isNaN(prevLat) && !isNaN(prevLon)) {
+      // Calcular direção do ponto anterior para o atual e inverter
+      const inverseBearing = calculateBearing(
+        prevLat,
+        prevLon,
+        currentLat,
+        currentLon
       );
 
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearestPointIndex = i;
-      }
+      return inverseBearing; // Já está na direção correta
     }
 
-    // 2. Encontrar um ponto adiante na rota para orientar (não muito próximo nem muito distante)
-    let targetPointIndex = nearestPointIndex;
-    const MIN_DISTANCE = 10; // metros
-    const MAX_POINTS_AHEAD = 20;
+    return null;
+  } else {
+    // Caso normal: pegar próximo ponto
+    nextInstruction = instructions[segmentIndex + 1];
+    nextLat = nextInstruction.latitude || nextInstruction.lat;
+    nextLon =
+      nextInstruction.longitude || nextInstruction.lon || nextInstruction.lng;
 
-    for (let i = 1; i <= MAX_POINTS_AHEAD; i++) {
-      const lookAheadIndex = nearestPointIndex + i;
-      if (lookAheadIndex >= routePoints.length) break;
+    if (isNaN(nextLat) || isNaN(nextLon)) return null;
 
-      const point = routePoints[lookAheadIndex];
+    // Calcular ângulo do ponto atual para o próximo
+    const bearing = calculateBearing(currentLat, currentLon, nextLat, nextLon);
 
-      // Normalizar coordenadas do ponto
-      const pointLat =
-        typeof point === "object"
-          ? point.lat ||
-            point.latitude ||
-            (Array.isArray(point) ? point[0] : null)
-          : Array.isArray(routePoints[lookAheadIndex])
-          ? routePoints[lookAheadIndex][0]
-          : null;
-
-      const pointLon =
-        typeof point === "object"
-          ? point.lng ||
-            point.lon ||
-            point.longitude ||
-            (Array.isArray(point) ? point[1] : null)
-          : Array.isArray(routePoints[lookAheadIndex])
-          ? routePoints[lookAheadIndex][1]
-          : null;
-
-      if (pointLat === null || pointLon === null) continue;
-
-      const distance = calculateDistance(
-        userPos.latitude,
-        userPos.longitude,
-        pointLat,
-        pointLon
-      );
-
-      // Se encontramos um ponto suficientemente distante, usá-lo
-      if (distance > MIN_DISTANCE) {
-        targetPointIndex = lookAheadIndex;
-        break;
-      }
-
-      // Caso não encontre ponto suficientemente distante, usar o último válido
-      targetPointIndex = lookAheadIndex;
-    }
-
-    // 3. Obter coordenadas do ponto alvo
-    const targetPoint = routePoints[targetPointIndex];
-
-    if (!targetPoint) {
-      console.warn("[updateUserMarkerDirection] Ponto alvo não encontrado");
-      return null;
-    }
-
-    // Normalizar coordenadas do ponto alvo
-    const targetLat =
-      typeof targetPoint === "object"
-        ? targetPoint.lat ||
-          targetPoint.latitude ||
-          (Array.isArray(targetPoint) ? targetPoint[0] : null)
-        : Array.isArray(routePoints[targetPointIndex])
-        ? routePoints[targetPointIndex][0]
-        : null;
-
-    const targetLon =
-      typeof targetPoint === "object"
-        ? targetPoint.lng ||
-          targetPoint.lon ||
-          targetPoint.longitude ||
-          (Array.isArray(targetPoint) ? targetPoint[1] : null)
-        : Array.isArray(routePoints[targetPointIndex])
-        ? routePoints[targetPointIndex][1]
-        : null;
-
-    if (targetLat === null || targetLon === null) {
-      console.warn(
-        "[updateUserMarkerDirection] Coordenadas do ponto alvo inválidas"
-      );
-      return null;
-    }
-
-    // 4. Calcular o bearing (ângulo/direção) entre o usuário e o ponto alvo
-    const bearing = calculateBearing(
-      userPos.latitude,
-      userPos.longitude,
-      targetLat,
-      targetLon
-    );
-
-    // Correção do ângulo para compensar a orientação do SVG - AQUI ESTÁ A CORREÇÃO
+    // O ângulo precisa ser ajustado para o sistema de coordenadas do SVG
     const correctedBearing = (bearing + 180) % 360;
 
-    if (debug) {
-      console.log(
-        `[updateUserMarkerDirection] Direção calculada: ${bearing.toFixed(
-          2
-        )}° ` +
-          `(índice próximo: ${nearestPointIndex}, alvo: ${targetPointIndex}, ` +
-          `distância: ${minDistance.toFixed(1)}m)`
-      );
-    }
-
-    // 5. Aplicar a rotação ao marcador do usuário
-    if (window.userMarker) {
-      if (typeof window.userMarker.setRotationAngle === "function") {
-        // Usando o plugin Leaflet.RotatedMarker
-        window.userMarker.setRotationAngle(correctedBearing);
-
-        if (debug) {
-          console.log(
-            `[updateUserMarkerDirection] Rotação aplicada ao marcador: ${correctedBearing.toFixed(
-              2
-            )}° (original: ${bearing.toFixed(2)}°)`
-          );
-        }
-      } else {
-        // Fallback: aplicar rotação via CSS
-        try {
-          const markerElement =
-            window.userMarker._icon ||
-            (window.userMarker.getElement
-              ? window.userMarker.getElement()
-              : null);
-
-          if (markerElement) {
-            markerElement.style.transform = `rotate(${correctedBearing}deg)`;
-            if (debug) {
-              console.log(
-                `[updateUserMarkerDirection] Rotação aplicada via CSS: ${correctedBearing.toFixed(
-                  2
-                )}°`
-              );
-            }
-          }
-        } catch (error) {
-          console.error(
-            "[updateUserMarkerDirection] Erro ao aplicar rotação via CSS:",
-            error
-          );
-        }
-      }
-    }
-
-    // CORREÇÃO: Adicionar de um objeto de debug para ajudar no diagnóstico
-    if (debug) {
-      window.lastDirectionDebug = {
-        from: [userPos.latitude, userPos.longitude],
-        to: [targetLat, targetLon],
-        bearing: bearing,
-        correctedBearing: correctedBearing,
-        targetPointIndex: targetPointIndex,
-        nearestPointIndex: nearestPointIndex,
-        minDistance: minDistance,
-      };
-    }
-
-    // Retornar o ângulo corrigido
+    console.log(
+      `[getSegmentDirection] Segmento #${segmentIndex}: direção fixa ${correctedBearing.toFixed(
+        1
+      )}°`
+    );
     return correctedBearing;
-  } catch (error) {
-    console.error("[updateUserMarkerDirection] Erro:", error);
-    return null;
   }
 }
 

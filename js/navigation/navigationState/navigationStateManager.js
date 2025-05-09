@@ -143,6 +143,8 @@ export const navigationState = {
   remainingDistance: 0,
   remainingTime: 0,
   isRotationEnabled: false,
+  isRotationEnabled: true,
+  currentHeading: 0,
   // Configurações de linguagem
   language: "pt",
   deviationDetected: false,

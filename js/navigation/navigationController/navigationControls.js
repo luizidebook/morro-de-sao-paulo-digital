@@ -1420,6 +1420,8 @@ export function addNavigationControls() {
   }
 
   console.log("[addNavigationControls] Controles de navegação adicionados");
+  // Adicionar o handler do botão de minimizar
+  addMinimizeButtonHandler();
 
   // ADICIONE ESTE DEBUG
   const banner = document.getElementById(UI_CONFIG.IDS.BANNER);
@@ -1437,11 +1439,10 @@ export function addNavigationControls() {
     },
   });
 
-  // Inicializar controles de navegação
   initNavigationControls({
     enableAutoMinimize: false,
     disableCancelConfirmation: false,
   });
 
-  // Restante do código...
+  navigationState.controlsInitialized = true;
 }

@@ -105,55 +105,95 @@ function selectBestVoice(voices) {
  * Fala o texto fornecido usando a voz configurada
  * @param {string} text Texto a ser falado
  */
-export function speak(text) {
-  // Verificar novamente o localStorage para garantir que temos o valor mais recente
-  const voiceEnabled = localStorage.getItem("voice-enabled") !== "false";
-  const isMuted = !voiceEnabled || voiceConfig.isMuted;
+// Corrigir a função speak com fallback para voice padrão
+export function speak(text, options = {}) {
+  if (!text) return false;
 
-  if (!window.speechSynthesis || isMuted || !text) {
-    console.log(
-      `[voiceSystem] speak() - Voz desativada ou sem texto: isMuted=${isMuted}, text=${!!text}`
-    );
-    return;
+  // Cancelar fala anterior se solicitado
+  if (options.cancelPrevious !== false) {
+    cancel();
   }
 
-  console.log(
-    `[voiceSystem] speak() - Sintetizando: "${text.substring(0, 30)}..."`
-  );
+  try {
+    // Verificar se navegador suporta síntese de voz
+    if (!window.speechSynthesis) {
+      console.warn(
+        "[voiceSystem] Síntese de voz não suportada neste navegador"
+      );
+      return false;
+    }
 
-  // Limpa o texto de tags HTML e caracteres especiais
-  const cleanedText = cleanTextForSpeech(text);
+    // Obter a voz configurada ou usar fallback
+    let configuredVoice = getConfiguredVoice();
 
-  // Verificar o idioma atual
-  const isHebrew =
-    voiceConfig.lang.startsWith("he") || document.documentElement.lang === "he";
+    // Se a voz configurada não estiver disponível, usar qualquer voz em português
+    if (!configuredVoice) {
+      console.warn(
+        "[voiceSystem] Voz configurada não encontrada, tentando encontrar alternativa"
+      );
 
-  // Verificar se estamos usando o fallback para Google TTS em hebraico
-  const savedVoice = localStorage.getItem("assistant-voice");
+      // Obter todas as vozes disponíveis
+      const voices = getAllVoices();
 
-  if (
-    (savedVoice === "google-hebrew-tts" || isHebrew) &&
-    voiceConfig.lang.startsWith("he")
-  ) {
-    console.log("[voiceSystem] Usando suporte especial para hebraico");
-    // Usar o módulo de suporte a hebraico
-    import("./hebrewVoiceSupport.js")
-      .then((module) => {
-        module.speakHebrew(cleanedText);
-      })
-      .catch((error) => {
-        console.error(
-          "[voiceSystem] Erro ao carregar suporte a hebraico:",
-          error
-        );
-        // Falhou, tentar método normal
-        speakWithDefaultSynthesis(cleanedText);
-      });
-    return;
+      // Tentar encontrar uma voz em português
+      configuredVoice =
+        voices.find((v) => v.lang.includes("pt") || v.lang.includes("PT")) ||
+        voices.find((v) => v.lang.includes("en")) || // Fallback para inglês
+        voices[0]; // Último recurso: usar primeira voz disponível
+    }
+
+    if (!configuredVoice) {
+      // Se ainda não temos voz, usar síntese padrão sem especificar voz
+      console.warn(
+        "[voiceSystem] Nenhuma voz apropriada encontrada, usando síntese padrão"
+      );
+      return speakWithDefaultSynthesis(text, options);
+    }
+
+    // Criar e configurar utterance
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    // Aplicar configurações
+    utterance.voice = configuredVoice;
+    utterance.rate = options.rate || 1.0;
+    utterance.pitch = options.pitch || 1.0;
+    utterance.volume = options.volume || 1.0;
+    utterance.lang = configuredVoice.lang;
+
+    // Adicionar eventos para monitoramento
+    utterance.onstart = () => {
+      isSpeaking = true;
+      console.log(`[voiceSystem] Falando: "${text}"`);
+
+      if (options.onStart) options.onStart();
+    };
+
+    utterance.onend = () => {
+      isSpeaking = false;
+      console.log(`[voiceSystem] Finalizada fala: "${text}"`);
+
+      if (options.onEnd) options.onEnd();
+    };
+
+    utterance.onerror = (event) => {
+      isSpeaking = false;
+      console.error(`[voiceSystem] Erro na síntese de voz: ${event.error}`);
+
+      if (options.onError) options.onError(event);
+
+      // Em caso de erro, tentar método alternativo
+      speakWithDefaultSynthesis(text, options);
+    };
+
+    // Falar o texto
+    window.speechSynthesis.speak(utterance);
+    return true;
+  } catch (error) {
+    console.error("[voiceSystem] Erro ao sintetizar voz:", error);
+
+    // Tentar método alternativo em caso de exceção
+    return speakWithDefaultSynthesis(text, options);
   }
-
-  // Método de síntese padrão
-  speakWithDefaultSynthesis(cleanedText);
 }
 
 // Função auxiliar para síntese padrão

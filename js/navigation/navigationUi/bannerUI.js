@@ -43,7 +43,7 @@ export function createNavigationBanner() {
   banner.id = bannerId;
   banner.className = "instruction-banner";
 
-  // Estrutura HTML completa com IDs corretos e progresso
+  // Garantir que o ID do botão esteja correto
   banner.innerHTML = `
     <div class="instruction-primary">
       <span id="${UI_CONFIG.IDS.INSTRUCTION_ARROW}" class="instruction-icon">↑</span>
@@ -77,6 +77,9 @@ export function createNavigationBanner() {
 
   // Adicionar estilos necessários
   addBannerStyles();
+
+  // NOVO: Adicionar event listener ao botão de minimizar imediatamente
+  setupMinimizeButton(banner);
 
   return banner;
 }
@@ -519,9 +522,20 @@ function buildDetailsText(
  * @param {HTMLElement} banner - Banner a configurar
  */
 export function setupMinimizeButton(banner) {
-  // CORREÇÃO: Usar UI_CONFIG.IDS.MINIMIZE_BUTTON em vez de UI_CONFIG.MINIMIZE_BUTTON_ID
+  // Usar o ID correto definido em UI_CONFIG.IDS.MINIMIZE_BUTTON
   const minimizeBtn = banner.querySelector(`#${UI_CONFIG.IDS.MINIMIZE_BUTTON}`);
-  if (!minimizeBtn) return;
+  if (!minimizeBtn) {
+    console.warn(
+      "[setupMinimizeButton] Botão não encontrado com ID:",
+      UI_CONFIG.IDS.MINIMIZE_BUTTON
+    );
+    return;
+  }
+
+  console.log(
+    "[setupMinimizeButton] Configurando botão de minimizar:",
+    minimizeBtn
+  );
 
   // Remover listeners anteriores para evitar duplicação
   const newBtn = minimizeBtn.cloneNode(true);
@@ -529,16 +543,24 @@ export function setupMinimizeButton(banner) {
     minimizeBtn.parentNode.replaceChild(newBtn, minimizeBtn);
   }
 
-  // Adicionar novo listener
+  // Adicionar novo listener com registro de logs para depuração
   newBtn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
 
+    console.log("[setupMinimizeButton] Botão clicado");
+
     const isMinimized = banner.classList.contains(UI_CONFIG.CLASSES.MINIMIZED);
     toggleMinimizedState(banner, !isMinimized);
-  });
-}
 
+    console.log(
+      "[setupMinimizeButton] Banner foi",
+      isMinimized ? "expandido" : "minimizado"
+    );
+  });
+
+  console.log("[setupMinimizeButton] Event listener configurado com sucesso");
+}
 /**
  * Alterna o estado minimizado do banner
  * @param {HTMLElement} banner - Banner de navegação
@@ -549,7 +571,11 @@ function toggleMinimizedState(banner, minimize) {
 
   const minimizeBtn = banner.querySelector(`#${UI_CONFIG.IDS.MINIMIZE_BUTTON}`);
 
+  // Adicionar classe transitória para detectar início da animação
   if (minimize) {
+    banner.classList.add("minimizing");
+    setTimeout(() => banner.classList.remove("minimizing"), 10);
+
     banner.classList.add(UI_CONFIG.CLASSES.MINIMIZED);
     if (minimizeBtn) {
       minimizeBtn.setAttribute("aria-expanded", "false");
@@ -558,7 +584,17 @@ function toggleMinimizedState(banner, minimize) {
         "Expandir instruções de navegação"
       );
     }
+
+    // Disparar evento para sincronização da UI
+    document.dispatchEvent(
+      new CustomEvent("banner:minimizing", {
+        detail: { banner, height: banner.offsetHeight },
+      })
+    );
   } else {
+    banner.classList.add("maximizing");
+    setTimeout(() => banner.classList.remove("maximizing"), 10);
+
     banner.classList.remove(UI_CONFIG.CLASSES.MINIMIZED);
     if (minimizeBtn) {
       minimizeBtn.setAttribute("aria-expanded", "true");
@@ -567,6 +603,13 @@ function toggleMinimizedState(banner, minimize) {
         "Minimizar instruções de navegação"
       );
     }
+
+    // Disparar evento para sincronização da UI
+    document.dispatchEvent(
+      new CustomEvent("banner:maximizing", {
+        detail: { banner, height: banner.offsetHeight },
+      })
+    );
   }
 }
 
@@ -781,7 +824,20 @@ export function ensureBannerIntegrity() {
   // Se o banner não existir, criar um novo
   if (!banner) {
     console.log("[ensureBannerIntegrity] Banner não existe, criando novo");
-    return createNavigationBanner();
+    const newBanner = createNavigationBanner();
+
+    // Adicionar o handler ao botão de minimizar
+    import("../navigationControls/navigationControls.js")
+      .then((module) => {
+        if (typeof module.addMinimizeButtonHandler === "function") {
+          module.addMinimizeButtonHandler();
+        }
+      })
+      .catch((err) =>
+        console.error("[ensureBannerIntegrity] Erro ao importar módulo:", err)
+      );
+
+    return newBanner;
   }
 
   // Verificar elementos essenciais
@@ -917,6 +973,7 @@ function addBannerStyles() {
       position: relative;
     }
     
+    /* Linha horizontal sempre presente */
     #${UI_CONFIG.IDS.MINIMIZE_BUTTON}::before, .minimize-button::before {
       content: '';
       width: 12px;
@@ -925,8 +982,9 @@ function addBannerStyles() {
       position: absolute;
     }
     
-    .instruction-banner:not(.minimized) #${UI_CONFIG.IDS.MINIMIZE_BUTTON}::after,
-    .instruction-banner:not(.minimized) .minimize-button::after {
+    /* Linha vertical - presente apenas quando minimizado (mostra o +) */
+    .instruction-banner.minimized #${UI_CONFIG.IDS.MINIMIZE_BUTTON}::after,
+    .instruction-banner.minimized .minimize-button::after {
       content: '';
       width: 2px;
       height: 12px;
@@ -1015,4 +1073,35 @@ function addBannerStyles() {
   console.log(
     "[addBannerStyles] Estilos CSS adicionados para o banner de navegação"
   );
+}
+
+/**
+ * Cria e retorna o elemento de barra de progresso
+ * @returns {HTMLElement} Elemento da barra de progresso
+ */
+function createProgressBar() {
+  // Container da barra
+  const progressContainer = document.createElement("div");
+  progressContainer.className = "progress-container";
+
+  // Barra de progresso
+  const progressBar = document.createElement("div");
+  progressBar.className = "progress-bar";
+  progressBar.id = "progress"; // ID específico necessário
+  progressBar.setAttribute("role", "progressbar");
+  progressBar.setAttribute("aria-valuenow", "0");
+  progressBar.setAttribute("aria-valuemin", "0");
+  progressBar.setAttribute("aria-valuemax", "100");
+
+  // Texto de progresso
+  const progressText = document.createElement("span");
+  progressText.id = "progress-text";
+  progressText.className = "progress-text";
+  progressText.textContent = "0%";
+
+  // Montagem
+  progressContainer.appendChild(progressBar);
+  progressContainer.appendChild(progressText);
+
+  return progressContainer;
 }

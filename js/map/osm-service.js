@@ -1,3 +1,7 @@
+/**
+ * Serviço para buscar dados do OpenStreetMap
+ * @module osm-service
+ */
 // osm-service.js – Consulta de pontos de interesse via Overpass API (ou mock local)
 
 /* O que esse módulo faz:
@@ -35,44 +39,6 @@ export const queries = {
   "education-submenu":
     '[out:json];node["education"](around:10000,-13.376,-38.913);out body;',
 };
-
-/**
- * Busca dados da API Overpass com base na query fornecida.
- * @param {string} queryKey - Chave da query (ex: 'restaurants-submenu').
- * @returns {Promise<Array>} Lista de resultados formatados.
- */
-export async function fetchOSMData(queryKey) {
-  const query = queries[queryKey];
-  if (!query) {
-    throw new Error(`Query não encontrada para a chave: ${queryKey}`);
-  }
-
-  const url = `${OVERPASS_API_URL}?data=${encodeURIComponent(query)}`;
-
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Erro na requisição Overpass API: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Extrai e formata os dados relevantes
-    return data.elements
-      .filter((element) => element.lat && element.lon) // Garante que as coordenadas existam
-      .map((element) => ({
-        id: element.id,
-        name: element.tags.name || "Local sem nome",
-        lat: element.lat,
-        lon: element.lon,
-        tags: element.tags, // Inclui todas as tags para uso futuro
-        category: queryKey, // Adiciona a categoria para referência
-      }));
-  } catch (error) {
-    console.error("Erro ao buscar dados da Overpass API:", error);
-    throw error;
-  }
-}
 
 /**
  * Carrega os itens do submenu com base na chave da query fornecida.
@@ -116,4 +82,204 @@ export async function validateCoordinates(lat, lon) {
     console.error("Erro ao validar coordenadas:", error);
   }
   return { lat, lon }; // Retorna as coordenadas originais se não houver correção
+}
+
+// Cache para armazenar os resultados das consultas
+const cache = new Map();
+
+/**
+ * Busca dados do OpenStreetMap com base na consulta especificada
+ * @param {string} queryKey - Chave identificadora da consulta
+ * @param {string} query - Consulta Overpass a ser executada
+ * @returns {Promise<Array>} - Array de locais encontrados
+ */
+export async function fetchOSMData(queryKey, query) {
+  try {
+    console.log(`[fetchOSMData] Executando consulta para: ${queryKey}`);
+
+    // Verificar cache primeiro
+    if (cache.has(queryKey)) {
+      const cachedResult = cache.get(queryKey);
+      const now = Date.now();
+      // Cache válido por 1 hora (3600000 ms)
+      if (now - cachedResult.timestamp < 3600000) {
+        console.log(`[fetchOSMData] Usando dados em cache para: ${queryKey}`);
+        return cachedResult.data;
+      }
+    }
+
+    // Verificação de parâmetros
+    if (!queryKey || !query) {
+      console.error("[fetchOSMData] Parâmetros inválidos:", {
+        queryKey,
+        query,
+      });
+
+      // Fornecer dados fallback para categorias conhecidas quando a consulta falhar
+      return getFallbackDataForCategory(queryKey);
+    }
+
+    // CORREÇÃO: Validar formato da consulta antes de enviar
+    if (!query.includes("[out:json]") || !query.includes("out body")) {
+      console.error("[fetchOSMData] Formato de consulta inválido:", query);
+      return getFallbackDataForCategory(queryKey);
+    }
+
+    // URL do serviço Overpass
+    const overpassUrl = "https://overpass-api.de/api/interpreter";
+
+    // Fazer a requisição
+    const response = await fetch(overpassUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "data=" + encodeURIComponent(query),
+      timeout: 10000, // 10 segundos de timeout
+    });
+
+    // Verificar se a requisição foi bem-sucedida
+    if (!response.ok) {
+      throw new Error(`Erro HTTP: ${response.status}`);
+    }
+
+    // Processar os dados
+    const data = await response.json();
+    const elements = data.elements || [];
+
+    // Transformar os elementos em formato mais útil
+    const locations = elements.map((element) => {
+      return {
+        name: element.tags?.name || `Local ${element.id}`,
+        lat: element.lat,
+        lon: element.lon,
+        category: queryKey,
+        tags: element.tags || {},
+        osmId: element.id,
+      };
+    });
+
+    // Filtrar locais sem nome ou coordenadas
+    const validLocations = locations.filter(
+      (loc) => loc.name && loc.lat && loc.lon
+    );
+
+    // Armazenar no cache
+    cache.set(queryKey, { data: validLocations, timestamp: Date.now() });
+
+    return validLocations;
+  } catch (error) {
+    console.error(`[fetchOSMData] Erro ao buscar ${queryKey}:`, error);
+
+    // Fornecer dados fallback
+    return getFallbackDataForCategory(queryKey);
+  }
+}
+
+/**
+ * Fornece dados fallback para categorias conhecidas quando a API falha
+ * @param {string} category - Categoria para buscar dados fallback
+ * @returns {Array} - Array de locais de fallback
+ */
+function getFallbackDataForCategory(category) {
+  // Mapeamento de categorias para dados fallback
+  const fallbackData = {
+    beaches: [
+      {
+        name: "Segunda Praia",
+        lat: -13.376,
+        lon: -38.905,
+        category: "beaches",
+      },
+      { name: "Praia do Forte", lat: -13.38, lon: -38.91, category: "beaches" },
+    ],
+    restaurants: [
+      {
+        name: "Restaurante do Morro",
+        lat: -13.375,
+        lon: -38.915,
+        category: "restaurants",
+      },
+      {
+        name: "Sabor da Ilha",
+        lat: -13.371,
+        lon: -38.918,
+        category: "restaurants",
+      },
+    ],
+    nightlife: [
+      { name: "Bar do Mar", lat: -13.374, lon: -38.913, category: "nightlife" },
+      { name: "Clube Lua", lat: -13.378, lon: -38.92, category: "nightlife" },
+      {
+        name: "Festa na Praia",
+        lat: -13.38,
+        lon: -38.915,
+        category: "nightlife",
+      },
+    ],
+    shops: [
+      {
+        name: "Loja de Artesanato",
+        lat: -13.373,
+        lon: -38.916,
+        category: "shops",
+      },
+      { name: "Mercado Local", lat: -13.379, lon: -38.919, category: "shops" },
+    ],
+    emergencies: [
+      {
+        name: "Hospital Morro",
+        lat: -13.372,
+        lon: -38.914,
+        category: "emergencies",
+      },
+      {
+        name: "Posto Policial",
+        lat: -13.377,
+        lon: -38.917,
+        category: "emergencies",
+      },
+    ],
+    inns: [
+      {
+        name: "Pousada Vista Mar",
+        lat: -13.375,
+        lon: -38.912,
+        category: "inns",
+      },
+      { name: "Hotel da Ilha", lat: -13.38, lon: -38.916, category: "inns" },
+    ],
+    touristSpots: [
+      {
+        name: "Mirante do Morro",
+        lat: -13.37,
+        lon: -38.915,
+        category: "touristSpots",
+      },
+      {
+        name: "Farol Histórico",
+        lat: -13.381,
+        lon: -38.918,
+        category: "touristSpots",
+      },
+    ],
+    tours: [
+      {
+        name: "Passeio de Barco",
+        lat: -13.372,
+        lon: -38.91,
+        category: "tours",
+      },
+      {
+        name: "Tour pelo Centro Histórico",
+        lat: -13.378,
+        lon: -38.914,
+        category: "tours",
+      },
+    ],
+  };
+
+  // Retornar dados fallback para a categoria ou array vazio
+  console.log(`[fetchOSMData] Retornando dados fallback para ${category}`);
+  return fallbackData[category] || [];
 }

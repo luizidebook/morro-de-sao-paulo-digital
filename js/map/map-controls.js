@@ -12,7 +12,10 @@ import {
   appendMessage,
 } from "../assistant/assistant.js";
 import { animateMapToLocalizationUser } from "../navigation/navigationUserLocation/user-location.js";
-import { updateUserMarker } from "../navigation/navigationUserLocation/user-location.js";
+import {
+  updateUserMarker,
+  hasSharedLocation,
+} from "../navigation/navigationUserLocation/user-location.js";
 import { setLastRouteData } from "../navigation/navigationState/navigationStateManager.js";
 import { dispatchActionEvent } from "../utils/ui-position.js";
 import { repositionMessagesArea } from "../utils/ui-position.js";
@@ -45,9 +48,15 @@ export function generateRouteCacheKey(
   destLon,
   profile
 ) {
-  return `${startLat.toFixed(6)}_${startLon.toFixed(6)}_${destLat.toFixed(
+  // Convert all parameters to numbers to ensure toFixed works
+  const sLat = parseFloat(startLat);
+  const sLon = parseFloat(startLon);
+  const dLat = parseFloat(destLat);
+  const dLon = parseFloat(destLon);
+
+  return `${sLat.toFixed(6)}_${sLon.toFixed(6)}_${dLat.toFixed(
     6
-  )}_${destLon.toFixed(6)}_${profile}`;
+  )}_${dLon.toFixed(6)}_${profile}`;
 }
 
 // Adicione esta função ao final do arquivo map-controls.js

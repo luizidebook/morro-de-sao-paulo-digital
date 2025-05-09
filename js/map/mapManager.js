@@ -91,12 +91,4 @@ export {
 } from "./uiMap.js";
 
 // --- osm-service.js ---
-export {
-  fetchOSMData,
-  loadSubMenu,
-  validateCoordinates,
-  queries,
-  NOMINATIM_URL,
-  OVERPASS_API_URL,
-  apiKey,
-} from "./osm-service.js";
+export { fetchOSMData, apiKey } from "./osm-service.js";

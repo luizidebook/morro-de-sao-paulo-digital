@@ -1,6 +1,6 @@
 // Atualização no assistant.js para integrar boas-vindas multilíngues com detecção de idioma
 
-import { processUserInput } from "./assistant-dialog/assistant-dialog.js";
+import { processUserInput } from "./assistant-dialog/dialog.js";
 import {
   buildWelcomeMessage,
   markVisit,

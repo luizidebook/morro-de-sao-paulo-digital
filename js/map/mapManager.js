@@ -73,9 +73,9 @@ export {
   requestAndTrackUserLocation,
   setupGeolocation,
   getCurrentPosition,
-  getBestEffortLocation,
   getPreciseLocationRealtime,
 } from "../navigation/navigationUserLocation/user-location.js";
+export { getBestEffortLocation } from "../navigation/navigationUserLocation/enhanced-geolocation.js";
 
 // --- map-routes.js ---
 export { showRoute, plotRouteOnMap } from "./map-controls.js";

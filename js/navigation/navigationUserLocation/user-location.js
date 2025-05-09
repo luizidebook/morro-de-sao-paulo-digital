@@ -916,9 +916,6 @@ export function updateUserMarker(lat, lon, heading = 0, accuracy = 15) {
         }
       }
 
-      // Center map on user location with zoom level 18
-      updateMapWithUserLocation(20);
-
       // Aplicar rotação usando plugin ou CSS
       if (typeof window.userMarker.setRotationAngle === "function") {
         window.userMarker.setRotationAngle(heading);

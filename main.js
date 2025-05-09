@@ -9,7 +9,7 @@ import {
   setupAssistantInteractions,
   createAssistantUI,
 } from "./js/assistant/assistant-ui/interface.js";
-import { processUserInput } from "./js/assistant/assistant-dialog/assistant-dialog.js";
+import { processUserInput } from "./js/assistant/assistant-dialog/dialog.js";
 import { appendMessage } from "./js/assistant/assistant.js";
 import { showWeatherWidget } from "./js/utils/weather-info.js";
 import { setupQuickActionButtonsEvents } from "./js/utils/quick-actions.js";

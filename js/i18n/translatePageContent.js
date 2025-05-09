@@ -334,6 +334,9 @@ function getTranslations(lang) {
       // Adicionar direções de navegação críticas
 
       // Traduções para navegação
+      calculating_route_to: "Calculando rota para",
+      navigation_head_southwest_on_rua_do_farol:
+        "Siga na direção sudoeste pela Rua do Farol",
       navigation_head_south_on_escada_da_rua_do_farol:
         "Siga ao sul pela Escada da Rua do Farol",
       navigation_turn_slight_left: "Faça uma leve curva à esquerda",

@@ -12,6 +12,10 @@ export default {
   settings_theme_auto: "Automático",
 
   // Traduções para navegação
+  calculating_route_to: "Calculando rota para",
+  navigation_head_southwest_on_rua_do_farol:
+    "Siga na direção sudoeste pela Rua do Farol",
+
   navigation_head_south_on_escada_da_rua_do_farol:
     "Siga ao sul pela Escada da Rua do Farol",
   navigation_turn_slight_left: "Faça uma leve curva à esquerda",
@@ -122,8 +126,7 @@ export default {
   no_places_in_category: "Não encontrei lugares na categoria {category}.",
   showing_all_locations_category:
     "Exibindo todos os locais de {category} no mapa. Gostaria de detalhes sobre algum deles?",
-  searching_category:
-    "Buscando {category} no mapa... Gostaria de ver todos ou filtrar por algum nome específico?",
+  searching_category: "Buscando {category} no mapa...",
   where_is_place_question: "Você gostaria de saber onde fica {place}?",
   tutorial_message: "Aqui estão algumas coisas que você pode me perguntar:",
   tutorial_beaches: "Mostrar as praias de Morro de São Paulo",

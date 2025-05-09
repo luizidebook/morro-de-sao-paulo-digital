@@ -9,11 +9,13 @@ import {
   setupAssistantInteractions,
   createAssistantUI,
 } from "./js/assistant/assistant-ui/interface.js";
-import { processUserInput } from "./js/assistant/assistant-dialog/dialog.js";
+import { processUserInput } from "./js/assistant/assistant-dialog/assistant-dialog.js";
 import { appendMessage } from "./js/assistant/assistant.js";
 import { showWeatherWidget } from "./js/utils/weather-info.js";
 import { setupQuickActionButtonsEvents } from "./js/utils/quick-actions.js";
 import { assistantMood } from "./js/assistant/assistant-mood/assistantMood.js";
+import { setupNavigationUIObserver } from "./js/utils/ui-position.js";
+import initMessagesPositionManager from "./js/utils/messages-position-manager.js";
 
 export let userLocation = {};
 export let userPopup = null;
@@ -108,9 +110,27 @@ function initApp() {
   });
   mapInstance = map; // Disponibilizar globalmente
   console.log("[initApp] Mapa inicializado:", map);
+  // Configurar observador de UI para navegação
+  setupNavigationUIObserver();
 
-  setupUIElements();
-  console.log("[initApp] setupUIElements executado");
+  // Monitorar eventos de minimização/maximização do banner para sincronizar UI
+  document.addEventListener("banner:minimizing", (e) => {
+    const { banner } = e.detail;
+    import("./js/utils/ui-position.js").then((module) => {
+      module.syncUIWithBannerTransition(banner, true);
+    });
+  });
+
+  document.addEventListener("banner:maximizing", (e) => {
+    const { banner } = e.detail;
+    import("./js/utils/ui-position.js").then((module) => {
+      module.syncUIWithBannerTransition(banner, false);
+    });
+  });
+  console.log("[initApp] Observador de UI para navegação configurado");
+
+  // Inicializar gerenciador de posicionamento de mensagens
+  initMessagesPositionManager();
 
   createAssistantUI("assistant-messages");
   console.log("[initApp] createAssistantUI executado");
@@ -122,26 +142,8 @@ function initApp() {
     console.log("[initApp] Botão de voz antigo removido");
   }
 
-  if (map && typeof map.whenReady === "function") {
-    map.whenReady(() => {
-      const mapHeight = map.getSize().y;
-      const offsetY = 40 - mapHeight / 2;
-      const centerLat = -13.3725457;
-      const centerLng = -38.9159969;
-      const centerPoint = map
-        .project([centerLat, centerLng], map.getZoom())
-        .subtract([0, offsetY]);
-      const targetLatLng = map.unproject(centerPoint, map.getZoom());
-      map.setView(targetLatLng, map.getZoom(), { animate: false });
-      console.log(
-        "[initApp] Mapa centralizado 40px acima do centro, centro:",
-        centerLat,
-        centerLng
-      );
-    });
-  } else {
-    console.error("[initApp] Instância do mapa inválida:", map);
-  }
+  setupUIElements();
+  console.log("[initApp] setupUIElements executado");
 
   showWeatherWidget();
 

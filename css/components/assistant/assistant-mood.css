@@ -4,7 +4,7 @@
 .quick-actions .action-button.primary.mood-button {
   position: fixed;
   bottom: 110px; /* Acima da área de input */
-  left: 1px;
+  left: 10px;
   width: 200px;
   height: 100px;
   min-width: 200px;
@@ -30,7 +30,6 @@
   width: 100px;
   height: 100px;
   bottom: 10px;
-  left: 1px !important; /* Importante para garantir que não seja sobrescrito */
   display: block;
   object-fit: contain;
   background: transparent;

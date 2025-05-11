@@ -10,7 +10,7 @@
       name="description"
       content="Guia digital interativo de Morro de São Paulo"
     />
-    <title>Morro Digital</title>
+    <title>Morro de São Paulo Digital</title>
     <link rel="stylesheet" href="./css/main.css" />
     <link rel="stylesheet" href="./css/components/map/map-rotation.css" />
 
@@ -130,22 +130,29 @@ href="https://unpkg.com/swiper/swiper-bundle.min.css"
 </div>
        
 
+<!-- Substituir o banner existente no index.html pelo seguinte: -->
+
 <div id="instruction-banner" class="instruction-banner hidden">
   <div class="instruction-primary">
-    <span id="instruction-arrow">⬆️</span>
-    <h2 id="instruction-main">Siga em frente</h2>
-    <button id="minimize-navigation-btn" aria-label="Minimizar instruções de navegação" aria-expanded="true"></button>
+    <span id="instruction-arrow" class="instruction-icon">⬆️</span>
+    <h2 id="instruction-main" class="instruction-main-text">Siga em frente</h2>
+    <button id="minimize-navigation-btn" class="minimize-button" aria-label="Minimizar instruções de navegação" aria-expanded="true"></button>
   </div>
   <div class="instruction-secondary">
-    <p id="instruction-details">200m - Rua Caminho do Farol</p>
-    <div class="instruction-extra">
-      <p id="instruction-distance">📏: 200m</p>
-      <p id="instruction-time">⏱️: 2 minutos</p>
+    <p id="instruction-details" class="instruction-details">Siga em frente por 100m</p>
+    <div class="progress-container">
+      <div id="route-progress" class="progress-bar" style="width: 0%"></div>
     </div>
-    <!-- Adicionar o elemento de progresso que está faltando -->
-    <div id="route-progress-container">
-      <progress id="route-progress" value="0" max="100"></progress>
-      <span id="progress-text">0%</span>
+    <div id="progress-text" class="progress-text">0%</div>
+    <div class="metrics-group">
+      <div class="metric">
+        <span class="metric-label">Distância</span>
+        <span id="instruction-distance" class="metric-value">0 m</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Tempo</span>
+        <span id="instruction-time" class="metric-value">0 min</span>
+      </div>
     </div>
   </div>
 </div>

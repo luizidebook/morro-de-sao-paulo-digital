@@ -16,6 +16,10 @@ import { updateUserMarker } from "../navigation/navigationUserLocation/user-loca
 import { setLastRouteData } from "../navigation/navigationState/navigationStateManager.js";
 import { dispatchActionEvent } from "../utils/ui-position.js";
 import { repositionMessagesArea } from "../utils/ui-position.js";
+import {
+  addLoadingIndicator,
+  removeLoadingIndicator,
+} from "../utils/loadingIndicator.js";
 /* O que esse módulo cobre:
 Inicializa o mapa OpenStreetMap com Leaflet.
 Centraliza o mapa em Morro de São Paulo.
@@ -2418,98 +2422,6 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Distância em metros
-}
-
-/**
- * Adiciona um indicador de carregamento/processamento no mapa
- *
- * @param {string} message - Mensagem a ser exibida no indicador
- * @returns {Object} Referência para o elemento DOM criado
- */
-function addLoadingIndicator(message = "Carregando...") {
-  try {
-    // Verificar se já existe um indicador ativo
-    const existingIndicator = document.getElementById("map-loading-indicator");
-    if (existingIndicator) {
-      existingIndicator.textContent = message;
-      return existingIndicator;
-    }
-
-    // Criar o elemento do indicador
-    const indicator = document.createElement("div");
-    indicator.id = "map-loading-indicator";
-    indicator.className = "map-loading-indicator";
-
-    // Adicionar spinner e texto
-    indicator.innerHTML = `
-      <div class="loading-spinner">
-        <div class="spinner"></div>
-      </div>
-      <div class="loading-text">${message}</div>
-    `;
-
-    // Adicionar estilo inline (caso o CSS não esteja carregado)
-    indicator.style.cssText = `
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background-color: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 12px 16px;
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      z-index: 1000;
-      font-size: 14px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    `;
-
-    // Adicionar ao DOM
-    const mapContainer = getMapContainer();
-    if (mapContainer) {
-      mapContainer.appendChild(indicator);
-      console.log("[addLoadingIndicator] Indicador adicionado:", message);
-    } else {
-      // Se não encontrou o container do mapa, adicionar ao body
-      document.body.appendChild(indicator);
-      console.log(
-        "[addLoadingIndicator] Indicador adicionado ao body:",
-        message
-      );
-    }
-
-    return indicator;
-  } catch (error) {
-    console.error("[addLoadingIndicator] Erro ao criar indicador:", error);
-    return null;
-  }
-}
-
-/**
- * Remove o indicador de carregamento do mapa
- *
- * @param {HTMLElement|null} indicatorElement - Referência opcional para o elemento específico
- */
-function removeLoadingIndicator(indicatorElement = null) {
-  try {
-    // Se foi fornecido um elemento específico
-    if (indicatorElement && indicatorElement.parentNode) {
-      indicatorElement.parentNode.removeChild(indicatorElement);
-      console.log("[removeLoadingIndicator] Indicador específico removido");
-      return;
-    }
-
-    // Caso contrário, procurar por qualquer indicador ativo
-    const indicator = document.getElementById("map-loading-indicator");
-    if (indicator && indicator.parentNode) {
-      indicator.parentNode.removeChild(indicator);
-      console.log("[removeLoadingIndicator] Indicador removido");
-    }
-  } catch (error) {
-    console.error("[removeLoadingIndicator] Erro ao remover indicador:", error);
-  }
 }
 
 /**

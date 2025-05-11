@@ -309,16 +309,116 @@ function findLastDestinationFromHistory() {
  * @returns {Promise<{ text: string, action?: Function, options?: string[], context?: object }>}
  */
 export async function processUserInput(input, context = {}) {
+  if (!input || typeof input !== "string") {
+    return {
+      text: "Por favor, digite algo para que eu possa ajudar.",
+    };
+  }
+
+  // Normalizar texto removendo acentos, convertendo para minúsculas
+  const normalizedInput = input
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+
   const ctx = getContext();
-  const normalized = input.trim().toLowerCase();
   const rotaRegex =
     /(como chegar|chegar|criar rota|rota|ir para|como vou para|route to|go to)/i;
 
+  // Verificar se é comando de encerramento de navegação
+  const navigationEndTerms = [
+    "encerrar navegacao",
+    "encerrar navegação",
+    "terminar navegacao",
+    "terminar navegação",
+    "finalizar navegacao",
+    "finalizar navegação",
+    "cancelar navegacao",
+    "cancelar navegação",
+    "parar navegacao",
+    "parar navegação",
+    "sair da navegacao",
+    "sair da navegação",
+    "desligar navegacao",
+    "fechar navegacao",
+    "parar rota",
+    "cancelar rota",
+    "encerrar rota",
+    "finalizar rota",
+    "terminar rota",
+    "voltar ao mapa",
+  ];
+
+  // Verificar se algum dos termos de encerramento está presente na entrada normalizada
+  const isEndNavigationCommand = navigationEndTerms.some(
+    (term) =>
+      normalizedInput.includes(term) ||
+      // Para capturar frases mais complexas como "quero encerrar a navegação por favor"
+      ((normalizedInput.includes("navegacao") ||
+        normalizedInput.includes("navegação")) &&
+        (normalizedInput.includes("encerrar") ||
+          normalizedInput.includes("terminar") ||
+          normalizedInput.includes("finalizar") ||
+          normalizedInput.includes("parar") ||
+          normalizedInput.includes("cancelar") ||
+          normalizedInput.includes("sair")))
+  );
+
+  if (isEndNavigationCommand) {
+    // Verificar se a navegação realmente está ativa antes de tentar cancelar
+    const isNavigationActive =
+      window.navigationState && window.navigationState.isActive;
+
+    if (isNavigationActive) {
+      console.log(
+        "[processUserInput] Comando de encerramento de navegação detectado"
+      );
+
+      try {
+        // Importar a função assincronamente para evitar dependências circulares
+        const { cancelNavigation } = await import(
+          "../navigation/navigationController/navigationController.js"
+        );
+
+        // Executar cancelamento da navegação
+        await cancelNavigation();
+
+        return {
+          text: "Navegação encerrada. Voltando ao modo de mapa normal.",
+          action: () => {
+            // Limpar qualquer estado de navegação pendente
+            updateContext({
+              pendingRoute: null,
+              selectedDestination: null,
+              lastIntent: "mapa",
+            });
+
+            // Se houver uma função específica para atualizar a UI após cancelamento
+            if (typeof refreshMapView === "function") {
+              refreshMapView();
+            }
+          },
+        };
+      } catch (error) {
+        console.error("[processUserInput] Erro ao cancelar navegação:", error);
+
+        return {
+          text: "Ocorreu um erro ao encerrar a navegação. Por favor, tente novamente ou use o botão de cancelar na interface.",
+        };
+      }
+    } else {
+      return {
+        text: "Não há navegação ativa no momento.",
+      };
+    }
+  }
+
   // Exemplo: Resposta contextual para favoritos
   if (
-    normalized.includes("favorito") ||
-    normalized.includes("favoritos") ||
-    normalized.includes("meus lugares")
+    normalizedInput.includes("favorito") ||
+    normalizedInput.includes("favoritos") ||
+    normalizedInput.includes("meus lugares")
   ) {
     const favs = getFavorites();
     if (favs.length === 0) {
@@ -333,8 +433,10 @@ export async function processUserInput(input, context = {}) {
   }
 
   // Exemplo: Adicionar/remover favorito
-  if (normalized.startsWith("adicionar aos favoritos")) {
-    const placeName = normalized.replace("adicionar aos favoritos", "").trim();
+  if (normalizedInput.startsWith("adicionar aos favoritos")) {
+    const placeName = normalizedInput
+      .replace("adicionar aos favoritos", "")
+      .trim();
     if (placeName) {
       addFavorite(placeName);
       return {
@@ -343,8 +445,10 @@ export async function processUserInput(input, context = {}) {
     }
   }
 
-  if (normalized.startsWith("remover dos favoritos")) {
-    const placeName = normalized.replace("remover dos favoritos", "").trim();
+  if (normalizedInput.startsWith("remover dos favoritos")) {
+    const placeName = normalizedInput
+      .replace("remover dos favoritos", "")
+      .trim();
     if (placeName) {
       removeFavorite(placeName);
       return {
@@ -354,7 +458,7 @@ export async function processUserInput(input, context = {}) {
   }
 
   // Exemplo: Histórico de conversa
-  if (normalized === "histórico" || normalized === "meu histórico") {
+  if (normalizedInput === "historico" || normalizedInput === "meu historico") {
     const history = getContext().history;
     return {
       text: formatHistoryMessage(history),
@@ -364,7 +468,7 @@ export async function processUserInput(input, context = {}) {
   // Exemplo: Contexto de espera ("awaiting")
   const awaiting = getAwaiting();
   if (awaiting && awaiting.type === "selecionar_local") {
-    const selected = normalized;
+    const selected = normalizedInput;
     const place = allPlaces.find((loc) => loc.name.toLowerCase() === selected);
     if (place) {
       updateContext({ lastPlace: place.name, lastIntent: "detalhes" });
@@ -391,7 +495,7 @@ export async function processUserInput(input, context = {}) {
   // Substitua este bloco nas linhas 421-450
   if (
     ctx.lastIntent === "detalhes" &&
-    (normalized === "fotos" || normalized === "imagens")
+    (normalizedInput === "fotos" || normalizedInput === "imagens")
   ) {
     if (ctx.lastPlace) {
       return {
@@ -429,7 +533,7 @@ export async function processUserInput(input, context = {}) {
   // Exemplo: Sugestão baseada em última categoria
   if (
     ctx.lastCategory &&
-    (normalized === "ver todos" || normalized === "mostrar todos")
+    (normalizedInput === "ver todos" || normalizedInput === "mostrar todos")
   ) {
     const locais = (locations[ctx.lastCategory] || []).filter(
       (l) => l.name && l.lat && l.lon
@@ -454,7 +558,7 @@ export async function processUserInput(input, context = {}) {
 
   // 1. Busca por nome exato ou parcial (mostra resumo, mas NÃO exibe fotos automaticamente)
   const found = allPlaces.find((loc) =>
-    normalized.includes(loc.name.toLowerCase())
+    normalizedInput.includes(loc.name.toLowerCase())
   );
   if (found) {
     updateContext({ lastPlace: found.name, lastIntent: "detalhes" });
@@ -473,7 +577,7 @@ export async function processUserInput(input, context = {}) {
   }
 
   // 1.1. Perguntas do tipo "onde fica" ou "onde está"
-  const ondeFicaMatch = normalized.match(
+  const ondeFicaMatch = normalizedInput.match(
     /onde (fica|está|encontra|localiza)[\s:]*([\w\s]+)/i
   );
   if (ondeFicaMatch) {
@@ -517,7 +621,7 @@ export async function processUserInput(input, context = {}) {
         cat.key !== "emergencies" &&
         cat.key !== "tours"
       ) {
-        if (cat.keywords.some((word) => normalized.includes(word))) {
+        if (cat.keywords.some((word) => normalizedInput.includes(word))) {
           const locais = (locations[cat.localKey] || []).filter(
             (l) => l.name && l.lat && l.lon && isWithinRadius(l.lat, l.lon)
           );
@@ -537,7 +641,7 @@ export async function processUserInput(input, context = {}) {
     // Busca OSM (Overpass) para todas as categorias
     if (
       cat.queryKey &&
-      cat.keywords.some((word) => normalized.includes(word))
+      cat.keywords.some((word) => normalizedInput.includes(word))
     ) {
       return {
         text: messages.categories.searching(getCategoryName(cat.key)),
@@ -559,12 +663,12 @@ export async function processUserInput(input, context = {}) {
 
   // 3. Localização do usuário
   if (
-    normalized.includes("minha localização") ||
-    normalized.includes("onde estou") ||
-    normalized.includes("me encontre") ||
-    normalized.includes("localização atual") ||
-    normalized.includes("my location") ||
-    normalized.includes("find me")
+    normalizedInput.includes("minha localizacao") ||
+    normalizedInput.includes("onde estou") ||
+    normalizedInput.includes("me encontre") ||
+    normalizedInput.includes("localizacao atual") ||
+    normalizedInput.includes("my location") ||
+    normalizedInput.includes("find me")
   ) {
     return {
       text: messages.userLocation.locating(),
@@ -573,11 +677,14 @@ export async function processUserInput(input, context = {}) {
   }
 
   // 4. Rota para um local
-  if (rotaRegex.test(normalized)) {
-    console.log("[processUserInput] Detecção de comando de rota:", normalized);
+  if (rotaRegex.test(normalizedInput)) {
+    console.log(
+      "[processUserInput] Detecção de comando de rota:",
+      normalizedInput
+    );
 
     let destino = allPlaces.find((loc) =>
-      normalized.includes(loc.name.toLowerCase())
+      normalizedInput.includes(loc.name.toLowerCase())
     );
     if (!destino) {
       destino = findLastDestinationFromHistory();
@@ -625,7 +732,7 @@ export async function processUserInput(input, context = {}) {
   // Detecta resposta afirmativa para navegação guiada - MODIFICADO
   if (
     /(iniciar navegação|navegação guiada|começar navegação|sim|iniciar|guiada|confirmar)/i.test(
-      normalized
+      normalizedInput
     )
   ) {
     // Obter contexto atual

@@ -13,28 +13,26 @@ function updateQuickActionsPosition() {
 
   // Observar mudanças
   const observer = new ResizeObserver(() => {
-    // MODIFICADO: Sempre manter left como 1px em qualquer situação
-    quickActions.style.left = "1px";
+    // Manter posição fixa e simples
+    quickActions.style.left = "10px";
 
     // Posição fixa acima da área de input
     quickActions.style.bottom = "85px";
 
-    // Em telas pequenas, ajustar apenas bottom, mas manter left fixo
+    // Em telas pequenas, ajustar
     if (window.innerWidth <= 480) {
+      quickActions.style.left = "5px";
       quickActions.style.bottom = "75px";
     }
 
     // Se o teclado estiver visível
     if (document.body.classList.contains("keyboard-visible")) {
       quickActions.style.bottom = "100px";
-      // IMPORTANTE: Garantir que left permaneça como 1px mesmo com teclado visível
-      quickActions.style.left = "1px";
     }
 
     console.log("[UI Position] Quick actions reposicionado: ", {
       inputAreaTop: inputArea.getBoundingClientRect().top,
       quickActionsBottom: quickActions.style.bottom,
-      quickActionsLeft: quickActions.style.left,
     });
   });
 
@@ -42,8 +40,8 @@ function updateQuickActionsPosition() {
   observer.observe(inputArea);
   observer.observe(document.body); // Observar também o body para detectar classe keyboard-visible
 
-  // Primeira atualização - MODIFICADO: Sempre 1px
-  quickActions.style.left = "1px";
+  // Primeira atualização
+  quickActions.style.left = window.innerWidth <= 480 ? "5px" : "10px";
   quickActions.style.bottom = window.innerWidth <= 480 ? "75px" : "85px";
 }
 
@@ -60,17 +58,7 @@ function fixIOSPositioning() {
     if (quickActions && assistantInputArea) {
       // Em iOS, garantir posições fixas para evitar problemas com teclado virtual
       quickActions.style.position = "fixed";
-      // MODIFICADO: Garantir que left seja sempre 1px no iOS
-      quickActions.style.left = "1px";
       quickActions.style.bottom = "85px";
-
-      // Garantir que o botão de humor tenha left: 1px
-      const moodButton = document.querySelector(
-        ".action-button.primary.mood-button"
-      );
-      if (moodButton) {
-        moodButton.style.left = "1px";
-      }
 
       assistantInputArea.style.position = "fixed";
       assistantInputArea.style.bottom = "0";
@@ -853,66 +841,3 @@ export function syncUIWithBannerTransition(banner, isMinimizing) {
     } do banner`
   );
 }
-
-/**
- * Função de segurança que garante que os elementos críticos da UI
- * mantenham suas propriedades consistentes em todas as situações
- */
-export function enforceUIConsistency() {
-  // Garantir que quick-actions e mood-button sempre tenham left: 1px
-  function enforcePositioning() {
-    const quickActions = document.querySelector(".quick-actions");
-    const moodButton = document.querySelector(
-      ".action-button.primary.mood-button"
-    );
-
-    if (quickActions && quickActions.style.left !== "1px") {
-      console.log(
-        "[UI Consistency] Corrigindo posição left de quick-actions para 1px"
-      );
-      quickActions.style.left = "1px";
-    }
-
-    if (moodButton && moodButton.style.left !== "1px") {
-      console.log(
-        "[UI Consistency] Corrigindo posição left de mood-button para 1px"
-      );
-      moodButton.style.left = "1px";
-    }
-  }
-
-  // Verificar imediatamente
-  enforcePositioning();
-
-  // Verificar periodicamente
-  const intervalId = setInterval(enforcePositioning, 1000);
-
-  // Verificar em eventos críticos
-  const events = ["resize", "orientationchange", "scroll", "focus", "blur"];
-  events.forEach((eventType) => {
-    window.addEventListener(eventType, enforcePositioning);
-  });
-
-  // Adicionar também para mudanças de DOM relevantes
-  const observer = new MutationObserver(enforcePositioning);
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ["style", "class"],
-  });
-
-  // Retornar função para limpar observers se necessário
-  return function cleanup() {
-    clearInterval(intervalId);
-    events.forEach((eventType) => {
-      window.removeEventListener(eventType, enforcePositioning);
-    });
-    observer.disconnect();
-  };
-}
-
-// Iniciar a verificação quando o documento estiver pronto
-document.addEventListener("DOMContentLoaded", () => {
-  enforceUIConsistency();
-});

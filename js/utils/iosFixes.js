@@ -18,7 +18,6 @@ function fixIOSKeyboard() {
   let windowHeight = window.innerHeight;
 
   // CORRIGIDO: Lidar melhor com eventos de resize em iOS
-  // CORRIGIDO: Lidar melhor com eventos de resize em iOS
   window.addEventListener("resize", () => {
     // Se a altura atual for menor que a altura original, o teclado provavelmente está visível
     if (window.innerHeight < windowHeight) {
@@ -28,19 +27,9 @@ function fixIOSKeyboard() {
       // NOVO: Corrigir posicionamento no iOS quando o teclado aparece
       const quickActions = document.querySelector(".quick-actions");
       const assistantMessages = document.getElementById("assistant-messages");
-      const moodButton = document.querySelector(
-        ".action-button.primary.mood-button"
-      );
 
       if (quickActions) {
         quickActions.style.bottom = "100px"; // Valor maior para evitar sobreposição
-        // ADICIONADO: Garantir que left permaneça 1px quando o teclado aparece
-        quickActions.style.left = "1px";
-      }
-
-      // ADICIONADO: Garantir que o mood button mantenha left: 1px
-      if (moodButton) {
-        moodButton.style.left = "1px";
       }
 
       if (assistantMessages) {
@@ -54,19 +43,9 @@ function fixIOSKeyboard() {
       // Restaurar posições originais
       const quickActions = document.querySelector(".quick-actions");
       const assistantMessages = document.getElementById("assistant-messages");
-      const moodButton = document.querySelector(
-        ".action-button.primary.mood-button"
-      );
 
       if (quickActions) {
         quickActions.style.bottom = "85px"; // Valor padrão
-        // ADICIONADO: Manter left: 1px ao restaurar layout
-        quickActions.style.left = "1px";
-      }
-
-      // ADICIONADO: Garantir que o mood button mantenha left: 1px
-      if (moodButton) {
-        moodButton.style.left = "1px";
       }
 
       if (assistantMessages) {
@@ -78,7 +57,22 @@ function fixIOSKeyboard() {
       window.scrollTo(0, 0);
     }
   });
+
+  // Ajustar o comportamento dos campos de entrada
+  document.querySelectorAll("input, textarea, select").forEach((input) => {
+    // Prevenir o zoom automático
+    input.style.fontSize = "16px";
+
+    // Adicionar evento de blur para restaurar a visualização
+    input.addEventListener("blur", () => {
+      // Dar tempo para o teclado recolher antes de resetar o scroll
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+      }, 100);
+    });
+  });
 }
+
 // Adicionar classe para ajustes CSS específicos quando o teclado está visível
 function setupKeyboardVisibilityTracking() {
   const inputs = document.querySelectorAll("input, textarea, select");

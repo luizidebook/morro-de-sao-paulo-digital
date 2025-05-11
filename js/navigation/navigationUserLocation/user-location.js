@@ -346,40 +346,17 @@ export function startUserTracking() {
   startPositionTracking();
 }
 
-/**
- * Inicia o rastreamento contínuo da posição do usuário
- * @returns {number} ID do observador de posição
- */
 export function startPositionTracking() {
-  console.group("[startPositionTracking] Iniciando rastreamento contínuo");
-
   // Limpar rastreamento anterior
   if (positionWatcherId !== null) {
-    console.log("[startPositionTracking] Limpando rastreamento anterior");
     stopLocationTracking();
   }
-
-  // Inicializar objeto de estado para garantir referência consistente
-  if (!window.navigationState) {
-    window.navigationState = {
-      isActive: false,
-      currentStepIndex: 0,
-      lastProcessedPosition: null,
-      lastUpdateTime: Date.now(),
-    };
-  }
-
-  console.log("[startPositionTracking] Configurando callbacks de tracking");
 
   // Iniciar rastreamento com enhanced-geolocation
   positionWatcherId = startLocationTracking(
     // Callback de sucesso
     (position) => {
       const { latitude, longitude, accuracy, heading, speed } = position;
-      const now = Date.now();
-
-      // Armazenar última posição válida para referência
-      const previousPosition = window.lastValidPosition || null;
 
       // Atualizar dados do usuário
       const userPos = {
@@ -388,49 +365,11 @@ export function startPositionTracking() {
         accuracy,
         heading: heading || 0,
         speed: speed || 0,
-        timestamp: now,
+        timestamp: Date.now(),
       };
 
-      console.log(
-        `[user-location] Nova posição recebida: (${latitude.toFixed(
-          6
-        )}, ${longitude.toFixed(6)}), precisão: ${accuracy}m`
-      );
-
-      // Calcular movimento desde a última posição válida
-      let distanceMoved = 0;
-      let timeSinceLastUpdate = 0;
-
-      if (previousPosition) {
-        distanceMoved = calculateDistance(
-          latitude,
-          longitude,
-          previousPosition.latitude,
-          previousPosition.longitude
-        );
-
-        timeSinceLastUpdate = now - (previousPosition.timestamp || now);
-
-        console.log(
-          `[user-location] Movimento detectado: ${distanceMoved.toFixed(
-            2
-          )}m em ${(timeSinceLastUpdate / 1000).toFixed(1)}s`,
-          `(velocidade: ${(
-            speed || distanceMoved / (timeSinceLastUpdate / 1000)
-          ).toFixed(2)} m/s)`
-        );
-      }
-
-      // IMPORTANTE: Armazenar a posição atual como nova referência
-      // se for significativamente diferente ou se for a primeira
-      if (
-        !previousPosition ||
-        distanceMoved > 2 ||
-        timeSinceLastUpdate > 5000
-      ) {
-        window.lastValidPosition = { ...userPos };
-        console.log("[user-location] Nova posição de referência registrada");
-      }
+      // Armazenar última posição válida
+      window.lastValidPosition = { ...userPos };
 
       // Atualizar objeto global userLocation
       userLocation = userPos;
@@ -438,10 +377,6 @@ export function startPositionTracking() {
 
       // Atualizar marcador com orientação apropriada
       if (window.navigationState && window.navigationState.isActive) {
-        console.log(
-          "[user-location] Atualizando marcador em modo de navegação"
-        );
-
         // Usar direção calculada quando em navegação ativa
         if (window.navigationState.calculatedBearing !== undefined) {
           updateUserMarker(
@@ -451,12 +386,7 @@ export function startPositionTracking() {
             accuracy
           );
         } else {
-          updateUserMarker(latitude, longitude, heading, accuracy);
-        }
-
-        // CRÍTICO: Atualizar navegação em tempo real com nova posição
-        if (typeof updateRealTimeNavigation === "function") {
-          updateRealTimeNavigation(userPos);
+          updateUserMarker(latitude, longitude, null, accuracy);
         }
       } else {
         // Modo normal - usar heading do dispositivo
@@ -475,24 +405,16 @@ export function startPositionTracking() {
         }
       }
 
-      // Verificar chegada e recalculação apenas se houver navegação ativa
-      if (window.navigationState && window.navigationState.isActive) {
-        // Verificar se chegamos ao destino
-        if (typeof checkDestinationArrival === "function") {
-          checkDestinationArrival(latitude, longitude);
-        }
+      // Verificar chegada e atualização em tempo real
+      if (typeof checkDestinationArrival === "function") {
+        checkDestinationArrival(latitude, longitude);
+      }
 
-        // Verificar se precisamos recalcular a rota
-        if (typeof shouldRecalculateRoute === "function") {
-          if (shouldRecalculateRoute(latitude, longitude)) {
-            console.log("[user-location] Desvio detectado, recalculando rota");
-            if (typeof notifyDeviation === "function") {
-              notifyDeviation(true);
-            }
-          }
-        }
+      if (typeof updateRealTimeNavigation === "function") {
+        updateRealTimeNavigation(userPos);
       }
     },
+
     // Callback de erro
     (error) => {
       console.warn("[startPositionTracking] Erro:", error);
@@ -519,14 +441,8 @@ export function startPositionTracking() {
     }
   );
 
-  console.log(
-    "[startPositionTracking] Rastreamento iniciado com ID:",
-    positionWatcherId
-  );
-  console.groupEnd();
   return positionWatcherId;
 }
-
 export function stopPositionTracking() {
   console.log("[user-location] Parando rastreamento de posição");
 
@@ -1030,72 +946,6 @@ export function updateUserMarker(lat, lon, heading = 0, accuracy = 15) {
   } catch (error) {
     console.error("[updateUserMarker] Error:", error);
     return false;
-  }
-}
-
-/**
- * Registra o movimento do usuário para histórico de trajeto
- * @param {number} lat - Latitude
- * @param {number} lng - Longitude
- * @param {number} heading - Direção
- */
-function recordUserMovement(lat, lng, heading) {
-  // Inicializar array de histórico se não existir
-  if (!window.userMovementHistory) {
-    window.userMovementHistory = [];
-  }
-
-  // Limitar tamanho do histórico (manter últimos 100 pontos)
-  if (window.userMovementHistory.length > 100) {
-    window.userMovementHistory.shift();
-  }
-
-  // Adicionar nova posição ao histórico
-  window.userMovementHistory.push({
-    lat,
-    lng,
-    heading,
-    timestamp: Date.now(),
-  });
-
-  // Opcionalmente, desenhar trajetória no mapa
-  if (
-    window.navigationState &&
-    window.navigationState.isActive &&
-    window.navigationState.showUserTrail
-  ) {
-    drawUserTrail();
-  }
-}
-
-/**
- * Atualiza o círculo de precisão do GPS ao redor do marcador do usuário
- * @param {number} lat - Latitude
- * @param {number} lng - Longitude
- * @param {number} accuracy - Precisão em metros
- */
-function updateAccuracyCircle(lat, lng, accuracy) {
-  try {
-    if (!map) return;
-
-    // Remover círculo anterior se existir
-    if (window.accuracyCircle) {
-      map.removeLayer(window.accuracyCircle);
-    }
-
-    // Criar novo círculo apenas se a precisão for informada e válida
-    if (accuracy && !isNaN(accuracy) && accuracy > 0) {
-      window.accuracyCircle = L.circle([lat, lng], {
-        radius: accuracy,
-        color: "#3388ff",
-        weight: 1,
-        opacity: 0.3,
-        fillColor: "#3388ff",
-        fillOpacity: 0.1,
-      }).addTo(map);
-    }
-  } catch (error) {
-    console.warn("[updateAccuracyCircle] Erro:", error);
   }
 }
 /**

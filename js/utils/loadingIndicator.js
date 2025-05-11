@@ -1,194 +1,113 @@
 /**
- * Cria e exibe um indicador de carregamento na interface
- * @param {string} message - Mensagem a exibir no indicador
- * @param {Object} options - Opções adicionais
- * @returns {HTMLElement} - Referência ao elemento do indicador
+ * Funções utilitárias para manipulação de indicadores de carregamento
  */
-export function addLoadingIndicator(message, options = {}) {
-  // Configurações padrão
-  const settings = {
-    position: options.position || "center", // center, top, bottom
-    overlay: options.overlay !== false,
-    spinnerSize: options.spinnerSize || "normal", // small, normal, large
-    theme: options.theme || "light", // light, dark
-  };
 
-  // Criar container do indicador
-  const indicator = document.createElement("div");
-  indicator.className = `loading-indicator loading-position-${settings.position} loading-theme-${settings.theme}`;
-  indicator.setAttribute("role", "status");
-  indicator.setAttribute("aria-live", "polite");
+/**
+ * Adiciona um indicador visual de carregamento ao corpo do documento
+ * @param {string} message - Mensagem a ser exibida
+ * @returns {HTMLElement} - Referência ao elemento criado
+ */
+export function addLoadingIndicator(message = "Carregando...") {
+  // Verificar se já existe um indicador
+  let loadingIndicator = document.querySelector(".loading-indicator");
 
-  // Adicionar overlay se necessário
-  if (settings.overlay) {
-    indicator.classList.add("loading-with-overlay");
+  // Se já existe, atualizar mensagem e retornar
+  if (loadingIndicator) {
+    loadingIndicator.querySelector(".loading-message").textContent = message;
+    return loadingIndicator;
   }
 
-  // Criar conteúdo do indicador
-  indicator.innerHTML = `
-    <div class="loading-content">
-      <div class="loading-spinner loading-spinner-${settings.spinnerSize}"></div>
-      <div class="loading-message">${message}</div>
+  // Criar novo indicador
+  loadingIndicator = document.createElement("div");
+  loadingIndicator.className = "loading-indicator";
+
+  // Adicionar estilos inline para garantir consistência
+  loadingIndicator.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    font-family: sans-serif;
+  `;
+
+  // Adicionar HTML interno
+  loadingIndicator.innerHTML = `
+    <div class="loading-container" style="
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      max-width: 85%;
+    ">
+      <div class="loading-spinner" style="
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 15px;
+      "></div>
+      <div class="loading-message" style="
+        color: #333;
+        font-size: 16px;
+        font-weight: 500;
+        text-align: center;
+      ">${message}</div>
     </div>
   `;
 
-  // Adicionar estilos se ainda não existirem
-  addLoadingStyles();
-
-  // Adicionar ao DOM
-  document.body.appendChild(indicator);
-
-  // Adicionar classe para animar entrada
-  setTimeout(() => {
-    indicator.classList.add("loading-visible");
-  }, 10);
-
-  console.log(`[addLoadingIndicator] Indicador adicionado: ${message}`);
-
-  return indicator;
-}
-
-/**
- * Remove um indicador de carregamento específico
- * @param {HTMLElement} indicator - Referência ao elemento do indicador
- */
-export function removeLoadingIndicator(indicator) {
-  if (!indicator) return;
-
-  indicator.classList.remove("loading-visible");
-  indicator.classList.add("loading-hidden");
-
-  // Remover do DOM após a transição
-  setTimeout(() => {
-    if (indicator.parentNode) {
-      indicator.parentNode.removeChild(indicator);
-      console.log("[removeLoadingIndicator] Indicador específico removido");
-    }
-  }, 300); // Tempo da transição
-}
-
-/**
- * Remove todos os indicadores de carregamento
- */
-export function removeAllLoadingIndicators() {
-  const indicators = document.querySelectorAll(".loading-indicator");
-  indicators.forEach(removeLoadingIndicator);
-  console.log("[removeAllLoadingIndicators] Todos os indicadores removidos");
-}
-
-/**
- * Adiciona estilos CSS para os indicadores de carregamento
- */
-function addLoadingStyles() {
-  if (document.getElementById("loading-indicator-styles")) return;
-
+  // Adicionar keyframes para animação
   const style = document.createElement("style");
-  style.id = "loading-indicator-styles";
   style.textContent = `
-    .loading-indicator {
-      position: fixed;
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      pointer-events: none;
-    }
-    
-    .loading-visible {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    
-    .loading-hidden {
-      opacity: 0;
-    }
-    
-    .loading-with-overlay {
-      background: rgba(0, 0, 0, 0.5);
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-    }
-    
-    .loading-position-center {
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-    }
-    
-    .loading-position-top {
-      top: 20px;
-      left: 0;
-      right: 0;
-    }
-    
-    .loading-position-bottom {
-      bottom: 20px;
-      left: 0;
-      right: 0;
-    }
-    
-    .loading-content {
-      background: white;
-      padding: 15px 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-      display: flex;
-      align-items: center;
-    }
-    
-    .loading-theme-dark .loading-content {
-      background: #333;
-      color: #fff;
-    }
-    
-    .loading-spinner {
-      border: 3px solid #f3f3f3;
-      border-top: 3px solid #3498db;
-      border-radius: 50%;
-      width: 24px;
-      height: 24px;
-      animation: spin 1s linear infinite;
-      margin-right: 10px;
-    }
-    
-    .loading-theme-dark .loading-spinner {
-      border-color: #555;
-      border-top-color: #3498db;
-    }
-    
-    .loading-spinner-small {
-      width: 16px;
-      height: 16px;
-      border-width: 2px;
-    }
-    
-    .loading-spinner-large {
-      width: 32px;
-      height: 32px;
-      border-width: 4px;
-    }
-    
-    .loading-message {
-      font-size: 14px;
-      font-weight: 500;
-    }
-    
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
   `;
-
   document.head.appendChild(style);
+
+  // Adicionar ao corpo do documento
+  document.body.appendChild(loadingIndicator);
+
+  return loadingIndicator;
+}
+
+/**
+ * Remove um indicador de carregamento do DOM
+ * @param {HTMLElement} loadingIndicator - Referência ao elemento a remover
+ */
+export function removeLoadingIndicator(loadingIndicator) {
+  // Se não for fornecido um elemento específico, procurar qualquer indicador de carregamento
+  if (!loadingIndicator) {
+    loadingIndicator = document.querySelector(".loading-indicator");
+  }
+
+  // Remover se existir
+  if (loadingIndicator && loadingIndicator.parentNode) {
+    // Adicionar classe para fade-out
+    loadingIndicator.style.opacity = "0";
+    loadingIndicator.style.transition = "opacity 0.3s ease";
+
+    // Remover após animação
+    setTimeout(() => {
+      if (loadingIndicator.parentNode) {
+        loadingIndicator.parentNode.removeChild(loadingIndicator);
+      }
+    }, 300);
+  }
 }
 
 export default {
   addLoadingIndicator,
   removeLoadingIndicator,
-  removeAllLoadingIndicators,
 };

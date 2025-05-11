@@ -14,14 +14,14 @@ function updateQuickActionsPosition() {
   // Observar mudanças
   const observer = new ResizeObserver(() => {
     // Manter posição fixa e simples
-    quickActions.style.left = "10px";
+    quickActions.style.left = "1px";
 
     // Posição fixa acima da área de input
     quickActions.style.bottom = "85px";
 
     // Em telas pequenas, ajustar
     if (window.innerWidth <= 480) {
-      quickActions.style.left = "5px";
+      quickActions.style.left = "1px";
       quickActions.style.bottom = "75px";
     }
 
@@ -41,7 +41,7 @@ function updateQuickActionsPosition() {
   observer.observe(document.body); // Observar também o body para detectar classe keyboard-visible
 
   // Primeira atualização
-  quickActions.style.left = window.innerWidth <= 480 ? "5px" : "10px";
+  quickActions.style.left = window.innerWidth <= 480 ? "1px" : "1px";
   quickActions.style.bottom = window.innerWidth <= 480 ? "75px" : "85px";
 }
 

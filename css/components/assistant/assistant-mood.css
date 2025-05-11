@@ -30,6 +30,7 @@
   width: 100px;
   height: 100px;
   bottom: 10px;
+  left: 1px !important; /* Importante para garantir que não seja sobrescrito */
   display: block;
   object-fit: contain;
   background: transparent;

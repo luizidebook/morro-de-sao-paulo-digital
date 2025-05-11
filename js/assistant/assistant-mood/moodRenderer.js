@@ -53,7 +53,6 @@ export class MoodRenderer {
       this.iconElement.alt = "Assistente";
       this.iconElement.style.width = "26px";
       this.iconElement.style.height = "26px";
-      this.iconElement.style.left = "1px"; // Manter alinhamento à esquerda
       this.iconElement.style.objectFit = "contain";
       this.iconElement.style.transition =
         "transform 0.3s ease, opacity 0.3s ease";
@@ -99,7 +98,6 @@ export class MoodRenderer {
       .quick-actions .action-button.primary {
         display: flex;
         justify-content: center;
-        left: 1px;
         align-items: center;
         transition: background-color 0.3s ease;
       }

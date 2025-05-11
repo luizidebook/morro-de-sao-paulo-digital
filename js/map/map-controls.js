@@ -20,6 +20,8 @@ import {
   addLoadingIndicator,
   removeLoadingIndicator,
 } from "../utils/loadingIndicator.js";
+import { calculateHaversineDistance } from "../navigation/navigationUserLocation/user-location.js";
+
 /* O que esse módulo cobre:
 Inicializa o mapa OpenStreetMap com Leaflet.
 Centraliza o mapa em Morro de São Paulo.
@@ -2422,62 +2424,4 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Distância em metros
-}
-
-/**
- * Obtém o elemento contenedor do mapa
- * @returns {HTMLElement|null} Elemento do mapa ou null se não encontrado
- */
-function getMapContainer() {
-  // Tentar por ID comum
-  let container = document.getElementById("map-container");
-
-  // Se não encontrou, tentar pela classe do Leaflet
-  if (!container) {
-    container = document.querySelector(".leaflet-container");
-  }
-
-  // Se ainda não encontrou e temos uma instância de mapa, tentar pelo container da instância
-  if (!container && map && typeof map.getContainer === "function") {
-    try {
-      container = map.getContainer();
-    } catch (e) {
-      console.warn(
-        "[getMapContainer] Erro ao obter container via instância de mapa:",
-        e
-      );
-    }
-  }
-
-  return container;
-}
-/**
- * Calcula a distância Haversine (em linha reta) entre dois pontos geográficos
- * @param {number} lat1 - Latitude do ponto 1
- * @param {number} lon1 - Longitude do ponto 1
- * @param {number} lat2 - Latitude do ponto 2
- * @param {number} lon2 - Longitude do ponto 2
- * @returns {number} Distância em metros
- */
-function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
-  // Validar coordenadas
-  if (!isValidCoordinate(lat1, lon1) || !isValidCoordinate(lat2, lon2)) {
-    console.warn("[calculateHaversineDistance] Coordenadas inválidas");
-    return 0;
-  }
-
-  const R = 6371000; // Raio da Terra em metros
-  const φ1 = (lat1 * Math.PI) / 180; // φ, λ em radianos
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c; // em metros
-
-  return distance;
 }

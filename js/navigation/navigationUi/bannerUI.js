@@ -356,6 +356,81 @@ export function updateInstructionBanner(instruction, lang = selectedLanguage) {
       console.error(
         "[updateInstructionBanner] Elementos críticos ausentes do banner"
       );
+      function addBannerStyles() {
+        const styleId = "navigation-banner-styles";
+
+        // Evitar adicionar estilos duplicados
+        if (document.getElementById(styleId)) {
+          return;
+        }
+
+        const styleElement = document.createElement("style");
+        styleElement.id = styleId;
+        styleElement.textContent = `
+    /* Estilos básicos do banner - mantidos da versão anterior */
+    .instruction-banner {
+      position: fixed;
+      top: 1px;
+      left: 0;
+      width: 100%;
+      background-color: #fff;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+      z-index: 1000;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      max-height: 80vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* Restante dos estilos anteriores... */
+    
+    /* CORREÇÃO: Estilos atualizados para a barra de progresso */
+    .progress-container {
+      position: relative;
+      height: 4px;
+      width: 100%;
+      background-color: rgba(0, 0, 0, 0.05);
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 0.75rem 0 0.5rem;
+    }
+    
+    .progress-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background-color: #38bdf8;
+      transition: width 0.5s ease-out;
+      border-radius: 2px;
+      min-width: 2px;
+    }
+    
+    #progress-text {
+      font-size: 0.8em;
+      text-align: center;
+      margin: 4px 0;
+      color: #555;
+    }
+    
+    .progress-bar.half-complete {
+      background: linear-gradient(90deg, #38bdf8, #66c2ff);
+    }
+    
+    .progress-bar.almost-complete {
+      background: linear-gradient(90deg, #66c2ff, #00cc66);
+      box-shadow: 0 0 5px rgba(0, 204, 102, 0.5);
+    }
+    
+    /* O restante dos estilos... */
+  `;
+
+        document.head.appendChild(styleElement);
+        console.log(
+          "[addBannerStyles] Estilos CSS adicionados para o banner de navegação"
+        );
+      }
       return false;
     }
 
@@ -862,7 +937,7 @@ export function ensureBannerIntegrity() {
       id: UI_CONFIG.IDS.INSTRUCTION_TIME,
       selector: `#${UI_CONFIG.IDS.INSTRUCTION_TIME}`,
     },
-    { id: "progress", selector: ".progress-indicator-fill" },
+    { id: "#route-progress", selector: ".progress-indicator-fill" },
   ];
 
   let needsRebuild = false;

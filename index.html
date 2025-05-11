@@ -10,7 +10,7 @@
       name="description"
       content="Guia digital interativo de Morro de São Paulo"
     />
-    <title>Morro de São Paulo Digital</title>
+    <title>Morro Digital</title>
     <link rel="stylesheet" href="./css/main.css" />
     <link rel="stylesheet" href="./css/components/map/map-rotation.css" />
 
@@ -130,28 +130,29 @@ href="https://unpkg.com/swiper/swiper-bundle.min.css"
 </div>
        
 
-<!-- Substituir o banner existente no index.html pelo seguinte: -->
-
 <div id="instruction-banner" class="instruction-banner hidden">
   <div class="instruction-primary">
     <span id="instruction-arrow" class="instruction-icon">⬆️</span>
     <h2 id="instruction-main" class="instruction-main-text">Siga em frente</h2>
-    <button id="minimize-navigation-btn" class="minimize-button" aria-label="Minimizar instruções de navegação" aria-expanded="true"></button>
+    <button id="minimize-navigation-btn" aria-label="Minimizar instruções de navegação" aria-expanded="true"></button>
   </div>
   <div class="instruction-secondary">
-    <p id="instruction-details" class="instruction-details">Siga em frente por 100m</p>
-    <div class="progress-container">
-      <div id="route-progress" class="progress-bar" style="width: 0%"></div>
+    <p id="instruction-details" class="instruction-details">200m - Rua Caminho do Farol</p>
+    
+    <!-- CORREÇÃO: Estrutura da barra de progresso alinhada com o JavaScript -->
+    <div class="progress-container" id="route-progress-container">
+      <div class="progress-bar" id="route-progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
     </div>
-    <div id="progress-text" class="progress-text">0%</div>
+    <div id="progress-text" style="text-align: center; font-size: 0.8em; margin: 4px 0;">0%</div>
+    
     <div class="metrics-group">
       <div class="metric">
         <span class="metric-label">Distância</span>
-        <span id="instruction-distance" class="metric-value">0 m</span>
+        <span id="instruction-distance" class="metric-value">200m</span>
       </div>
       <div class="metric">
         <span class="metric-label">Tempo</span>
-        <span id="instruction-time" class="metric-value">0 min</span>
+        <span id="instruction-time" class="metric-value">2 minutos</span>
       </div>
     </div>
   </div>

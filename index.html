@@ -130,7 +130,25 @@ href="https://unpkg.com/swiper/swiper-bundle.min.css"
 </div>
        
 
-
+<div id="instruction-banner" class="instruction-banner hidden">
+  <div class="instruction-primary">
+    <span id="instruction-arrow">⬆️</span>
+    <h2 id="instruction-main">Siga em frente</h2>
+    <button id="minimize-navigation-btn" aria-label="Minimizar instruções de navegação" aria-expanded="true"></button>
+  </div>
+  <div class="instruction-secondary">
+    <p id="instruction-details">200m - Rua Caminho do Farol</p>
+    <div class="instruction-extra">
+      <p id="instruction-distance">📏: 200m</p>
+      <p id="instruction-time">⏱️: 2 minutos</p>
+    </div>
+    <!-- Adicionar o elemento de progresso que está faltando -->
+    <div id="route-progress-container">
+      <progress id="route-progress" value="0" max="100"></progress>
+      <span id="progress-text">0%</span>
+    </div>
+  </div>
+</div>
 
     <!-- Loading Overlay -->
     <div id="loading-overlay">
@@ -151,6 +169,22 @@ href="https://unpkg.com/swiper/swiper-bundle.min.css"
       });
 
     </script>
+
+    <!-- No final do seu index.html, antes de fechar o </body> -->
+<script type="module">
+  // Garantir que todos os módulos de navegação sejam carregados
+  import './js/navigation/navigationIntegration.js';
+  
+  // Certificar que as funções de navegação estejam disponíveis globalmente
+  document.addEventListener('DOMContentLoaded', () => {
+    // Verificar se o sistema de navegação está disponível
+    if (typeof window.startNavigation !== 'function') {
+      console.error('Sistema de navegação não carregado corretamente!');
+    } else {
+      console.log('Sistema de navegação inicializado com sucesso!');
+    }
+  });
+</script>
   </body>
 </html>
 

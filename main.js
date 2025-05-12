@@ -16,6 +16,7 @@ import { setupQuickActionButtonsEvents } from "./js/utils/quick-actions.js";
 import { assistantMood } from "./js/assistant/assistant-mood/assistantMood.js";
 import { setupNavigationUIObserver } from "./js/utils/ui-position.js";
 import initMessagesPositionManager from "./js/utils/messages-position-manager.js";
+import { integrateNavigationSystems } from "./js/navigation/navigationIntegration.js";
 
 export let userLocation = {};
 export let userPopup = null;
@@ -197,6 +198,8 @@ function initApp() {
 
     // Atualizar elementos dinâmicos que não têm atributos data-i18n
     updateDynamicElements(newLang);
+    // Outras inicializações
+    integrateNavigationSystems();
   });
 }
 

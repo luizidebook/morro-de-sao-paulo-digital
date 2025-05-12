@@ -18,7 +18,7 @@
 import { navigationState } from "../navigationState/navigationStateManager.js";
 import { cancelNavigation } from "./navigationController.js";
 import { map } from "../../map/map-controls.js";
-import { calculateDistance } from "./navigationController.js";
+import { calculateDistance } from "../navigationUtils/distanceCalculator.js";
 // Importações de utils e UI
 import { UI_CONFIG } from "../navigationUi/navigationConfig.js";
 
@@ -1413,36 +1413,235 @@ export function createNavigationBanner() {
   return banner;
 }
 
+/**
+ * Adiciona e configura os controles de navegação ao banner
+ * @returns {boolean} Sucesso da operação
+ */
 export function addNavigationControls() {
-  if (navigationState.controlsInitialized) {
-    console.log("[addNavigationControls] Controles já inicializados, pulando");
+  try {
+    if (navigationState.controlsInitialized) {
+      console.log(
+        "[addNavigationControls] Controles já inicializados, pulando"
+      );
+      return true;
+    }
+
+    console.log("[addNavigationControls] Adicionando controles de navegação");
+
+    // Verificar se banner existe
+    const banner = document.getElementById(UI_CONFIG.IDS.BANNER);
+    if (!banner) {
+      console.error("[addNavigationControls] Banner não encontrado");
+      return false;
+    }
+
+    // Adicionar o handler do botão de minimizar
+    addMinimizeButtonHandler();
+
+    // Logs para diagnóstico
+    console.debug("[addNavigationControls] Estado atual do banner:", {
+      existe: !!banner,
+      html: banner ? banner.outerHTML.substring(0, 150) + "..." : "N/A",
+      botaoMinimizar: banner
+        ? banner.querySelector(`#${UI_CONFIG.IDS.MINIMIZE_BUTTON}`)
+        : null,
+      idsBotao: {
+        usado: UI_CONFIG.IDS.MINIMIZE_BUTTON,
+        encontrado: banner
+          ? banner.querySelector(`#${UI_CONFIG.IDS.MINIMIZE_BUTTON}`) !== null
+          : false,
+      },
+    });
+
+    // Criar container para controles de navegação se não existir
+    let navigationControlsContainer = document.getElementById(
+      "navigation-controls-container"
+    );
+    if (!navigationControlsContainer) {
+      navigationControlsContainer = document.createElement("div");
+      navigationControlsContainer.id = "navigation-controls-container";
+      navigationControlsContainer.className = "navigation-controls-container";
+      document.body.appendChild(navigationControlsContainer);
+    }
+
+    // Adicionar botão de cancelamento de navegação
+    const cancelButton = document.createElement("button");
+    cancelButton.className = "nav-control-button cancel-navigation-button";
+    cancelButton.setAttribute("aria-label", "Cancelar navegação");
+    cancelButton.innerHTML = "<span>✕</span>";
+    cancelButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Confirmar cancelamento
+      confirmCancelNavigation();
+    });
+
+    navigationControlsContainer.appendChild(cancelButton);
+
+    // Adicionar botão de modo 3D
+    const navigation3DButton = document.createElement("button");
+    navigation3DButton.className = "nav-control-button toggle-3d-button";
+    navigation3DButton.setAttribute("aria-label", "Alternar visualização 3D");
+    navigation3DButton.innerHTML = "<span>3D</span>";
+    navigation3DButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Alternar modo 3D
+      const is3dActive = toggle3DNavigationMode();
+
+      // Atualizar estado visual do botão
+      if (is3dActive) {
+        navigation3DButton.classList.add("active");
+        provideTactileFeedback("medium");
+      } else {
+        navigation3DButton.classList.remove("active");
+        provideTactileFeedback("light");
+      }
+
+      console.log(
+        `[addNavigationControls] Modo 3D ${
+          is3dActive ? "ativado" : "desativado"
+        }`
+      );
+    });
+
+    // Adicionar ao container de controles de navegação
+    navigationControlsContainer.appendChild(navigation3DButton);
+
+    // Adicionar botão de rotação do mapa
+    const rotationButton = document.createElement("button");
+    rotationButton.className = "nav-control-button map-rotation-button";
+    rotationButton.setAttribute(
+      "aria-label",
+      "Alternar rotação automática do mapa"
+    );
+    rotationButton.innerHTML = "<span>🧭</span>";
+    rotationButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Alternar rotação do mapa
+      toggleMapOrientation();
+    });
+
+    navigationControlsContainer.appendChild(rotationButton);
+
+    // Adicionar estilos CSS necessários para os novos botões
+    addNavigationControlsStyles();
+
+    // Inicializar controles com configurações
+    initNavigationControls({
+      enableAutoMinimize: false,
+      disableCancelConfirmation: false,
+    });
+
+    // Adicionar controles de orientação para rotação do mapa
+    addOrientationControl();
+
+    // Iniciar monitoramento
+    startNavigationMonitoring();
+
+    // Marcar como inicializado
+    navigationState.controlsInitialized = true;
+
+    console.log(
+      "[addNavigationControls] Controles de navegação adicionados com sucesso"
+    );
+    return true;
+  } catch (error) {
+    console.error(
+      "[addNavigationControls] Erro ao adicionar controles:",
+      error
+    );
+    return false;
+  }
+}
+
+/**
+ * Adiciona estilos CSS para os controles de navegação
+ */
+function addNavigationControlsStyles() {
+  // Verificar se os estilos já foram adicionados
+  if (document.getElementById("navigation-controls-styles")) {
     return;
   }
 
-  console.log("[addNavigationControls] Controles de navegação adicionados");
-  // Adicionar o handler do botão de minimizar
-  addMinimizeButtonHandler();
+  const styleElement = document.createElement("style");
+  styleElement.id = "navigation-controls-styles";
+  styleElement.textContent = `
+    .navigation-controls-container {
+      position: fixed;
+      bottom: 130px;
+      right: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 1000;
+    }
+    
+    .nav-control-button {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background-color: white;
+      border: none;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s ease;
+    }
+    
+    .nav-control-button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+    }
+    
+    .nav-control-button:active {
+      transform: scale(0.95);
+    }
+    
+    .toggle-3d-button {
+      color: #3b82f6;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    
+    .toggle-3d-button.active {
+      background-color: #3b82f6;
+      color: white;
+    }
+    
+    .cancel-navigation-button {
+      color: #ef4444;
+      font-size: 18px;
+    }
+    
+    .map-rotation-button {
+      font-size: 18px;
+      color: #333;
+    }
+    
+    .map-rotation-button.active {
+      background-color: #4b5563;
+      color: white;
+    }
+    
+    @media (max-width: 768px) {
+      .navigation-controls-container {
+        bottom: 80px;
+      }
+      
+      .nav-control-button {
+        width: 40px;
+        height: 40px;
+      }
+    }
+  `;
 
-  // ADICIONE ESTE DEBUG
-  const banner = document.getElementById(UI_CONFIG.IDS.BANNER);
-  console.log("[addNavigationControls] Estado atual do banner:", {
-    existe: !!banner,
-    html: banner ? banner.innerHTML : "N/A",
-    botaoMinimizar: banner
-      ? banner.querySelector(`#${UI_CONFIG.IDS.MINIMIZE_BUTTON}`)
-      : null,
-    idsBotao: {
-      usado: UI_CONFIG.IDS.MINIMIZE_BUTTON,
-      encontrado: banner
-        ? banner.querySelector(`#${UI_CONFIG.IDS.MINIMIZE_BUTTON}`) !== null
-        : false,
-    },
-  });
-
-  initNavigationControls({
-    enableAutoMinimize: false,
-    disableCancelConfirmation: false,
-  });
-
-  navigationState.controlsInitialized = true;
+  document.head.appendChild(styleElement);
 }

@@ -14,15 +14,15 @@ function updateQuickActionsPosition() {
   // Observar mudanças
   const observer = new ResizeObserver(() => {
     // Manter posição fixa e simples
-    quickActions.style.left = "10px";
+    quickActions.style.left = "1px";
 
     // Posição fixa acima da área de input
     quickActions.style.bottom = "85px";
 
     // Em telas pequenas, ajustar
     if (window.innerWidth <= 480) {
-      quickActions.style.left = "5px";
-      quickActions.style.bottom = "75px";
+      quickActions.style.left = "1px";
+      quickActions.style.bottom = "275px";
     }
 
     // Se o teclado estiver visível
@@ -42,7 +42,7 @@ function updateQuickActionsPosition() {
 
   // Primeira atualização
   quickActions.style.left = window.innerWidth <= 480 ? "5px" : "10px";
-  quickActions.style.bottom = window.innerWidth <= 480 ? "75px" : "85px";
+  quickActions.style.bottom = window.innerWidth <= 480 ? "275px" : "285px";
 }
 
 // Ajuste para iOS
@@ -58,7 +58,7 @@ function fixIOSPositioning() {
     if (quickActions && assistantInputArea) {
       // Em iOS, garantir posições fixas para evitar problemas com teclado virtual
       quickActions.style.position = "fixed";
-      quickActions.style.bottom = "85px";
+      quickActions.style.bottom = "385px";
 
       assistantInputArea.style.position = "fixed";
       assistantInputArea.style.bottom = "0";
@@ -361,7 +361,7 @@ export function setNavigationStatus(isActive) {
 // Adicionar ao arquivo existente
 
 /**
- * Reposiciona a área de mensagens do assistente com transição suave e precisa
+ * Reposiciona a área de mensagens do assistente com transição suave
  * @param {boolean} reposition - Se deve reposicionar (true) ou restaurar (false)
  * @param {boolean} animate - Se deve animar a transição
  * @returns {boolean} Sucesso da operação
@@ -384,9 +384,6 @@ export function repositionMessagesArea(reposition = true, animate = true) {
     return false;
   }
 
-  // Obter referência ao ícone de humor para posicionamento
-  const moodIcon = document.querySelector(".mood-icon");
-
   // Salvar posição original apenas na primeira vez
   if (reposition && !messagesArea.hasAttribute("data-original-position")) {
     try {
@@ -394,173 +391,92 @@ export function repositionMessagesArea(reposition = true, animate = true) {
       messagesArea.setAttribute(
         "data-original-position",
         JSON.stringify({
-          top: style.top,
-          left: style.left,
-          right: style.right,
-          transform: style.transform,
+          top: "40%",
+          left: "50%",
+          transform: "translateX(-50%)",
           maxWidth: style.maxWidth,
           position: style.position,
           zIndex: style.zIndex,
           opacity: style.opacity,
         })
       );
-      console.log("[repositionMessagesArea] Posição original salva:", {
-        top: style.top,
-        left: style.left,
-        maxWidth: style.maxWidth,
-      });
+      console.log("[repositionMessagesArea] Posição original salva");
     } catch (error) {
       console.warn("[repositionMessagesArea] Erro ao salvar posição:", error);
     }
   }
 
-  if (reposition) {
-    // POSICIONAMENTO ATUALIZADO: left: 70% e max-width: 90%
-    if (animate) {
-      // Preparação para a animação
-      messagesArea.style.transition = "none";
-      void messagesArea.offsetWidth; // Forçar reflow
+  // IMPORTANTE: Sempre usar a mesma posição, independentemente do reposition
+  // Configuração para qualquer estado
+  if (animate) {
+    // Preparação para a animação
+    messagesArea.style.transition = "none";
+    void messagesArea.offsetWidth; // Forçar reflow
 
-      // Configuração inicial
-      messagesArea.style.position = "fixed";
-      messagesArea.style.zIndex = "1050";
-      messagesArea.style.display = "flex";
-      messagesArea.style.flexDirection = "column";
-      messagesArea.style.opacity = "0";
-      messagesArea.style.transform = "scale(0.95)";
+    // Configuração inicial
+    messagesArea.style.position = "fixed";
+    messagesArea.style.zIndex = "1050";
+    messagesArea.style.display = "flex";
+    messagesArea.style.flexDirection = "column";
 
-      // Importante: Definir left para 70% e max-width para 90%
-      messagesArea.style.left = "61%";
-      messagesArea.style.right = "auto";
-      messagesArea.style.top = "auto";
-      messagesArea.style.bottom = "110px"; // Posicionar acima da área de input
-      messagesArea.style.maxWidth = "90%"; // 90% em vez de 70%
-      messagesArea.style.width = "auto";
-      // Remover qualquer definição de altura
-      messagesArea.style.height = "auto";
+    // POSIÇÃO FIXA: sempre 50% left, 40% top, centralizado com transform
+    messagesArea.style.left = "50%";
+    messagesArea.style.top = "40%";
+    messagesArea.style.transform = "translateX(-50%)";
+    messagesArea.style.right = "auto";
+    messagesArea.style.bottom = "auto";
+    messagesArea.style.maxWidth = "95%";
+    messagesArea.style.width = "auto";
+    messagesArea.style.height = "auto";
 
-      // Aplicar transição e animar
-      requestAnimationFrame(() => {
-        messagesArea.style.transition =
-          "all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)";
-        messagesArea.style.opacity = "1";
-        messagesArea.style.transform = "scale(1)";
-
-        setTimeout(() => {
-          messagesArea.classList.add("repositioned");
-          // Removido ajuste de altura
-          console.log(
-            "[repositionMessagesArea] Reposicionamento animado concluído para left: 70%, max-width: 90%"
-          );
-        }, 350);
-      });
-    } else {
-      // Aplicação imediata sem animação
-      messagesArea.style.position = "fixed";
-      messagesArea.style.zIndex = "1050";
-      messagesArea.style.left = "61%";
-      messagesArea.style.right = "auto";
-      messagesArea.style.top = "auto";
-      messagesArea.style.bottom = "110px";
-      messagesArea.style.maxWidth = "90%"; // 90% em vez de 70%
-      messagesArea.style.width = "auto";
-      messagesArea.style.opacity = "1";
-      messagesArea.style.transform = "none";
-      messagesArea.style.height = "auto"; // Deixar altura como auto
-
+    // Se estiver reposicionando, adicione a classe, senão remova
+    if (reposition) {
       messagesArea.classList.add("repositioned");
-      // Removido ajuste de altura
+    } else {
+      messagesArea.classList.remove("repositioned");
+    }
+
+    // Aplicar transição e animar
+    requestAnimationFrame(() => {
+      messagesArea.style.transition =
+        "all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)";
+      messagesArea.style.opacity = "1";
+      messagesArea.style.transform = "translateX(-50%)";
 
       console.log(
-        "[repositionMessagesArea] Reposicionamento imediato concluído para left: 70%, max-width: 90%"
+        `[repositionMessagesArea] Animação concluída - sempre em left: 50%, top: 40%`
       );
-    }
-
-    return true;
+    });
   } else {
-    // Restaurar posição original
-    if (messagesArea.hasAttribute("data-original-position")) {
-      try {
-        const originalPosition = JSON.parse(
-          messagesArea.getAttribute("data-original-position")
-        );
+    // Aplicação imediata sem animação
+    messagesArea.style.position = "fixed";
+    messagesArea.style.zIndex = "1050";
+    messagesArea.style.left = "50%";
+    messagesArea.style.top = "40%";
+    messagesArea.style.transform = "translateX(-50%)";
+    messagesArea.style.right = "auto";
+    messagesArea.style.bottom = "auto";
+    messagesArea.style.maxWidth = "95%";
+    messagesArea.style.width = "auto";
+    messagesArea.style.opacity = "1";
+    messagesArea.style.height = "auto";
 
-        if (animate) {
-          // Animação para restaurar posição
-          messagesArea.style.transition =
-            "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)";
-          messagesArea.style.opacity = "0.7";
-
-          setTimeout(() => {
-            messagesArea.classList.remove("repositioned");
-            messagesArea.style.top = originalPosition.top || "40%";
-            messagesArea.style.left = originalPosition.left || "50%";
-            messagesArea.style.right = "auto";
-            messagesArea.style.bottom = "auto";
-            messagesArea.style.transform =
-              originalPosition.transform || "translateX(-50%)";
-            messagesArea.style.maxWidth = originalPosition.maxWidth || "95%";
-            messagesArea.style.width = "auto";
-            messagesArea.style.height = "auto"; // Voltar para auto
-            messagesArea.style.opacity = "1";
-
-            // Restaurar outros estilos
-            resetMessagesContainerStyles(messagesContainer);
-
-            console.log(
-              "[repositionMessagesArea] Posição original restaurada com animação"
-            );
-          }, 50);
-        } else {
-          // Restauração imediata
-          messagesArea.classList.remove("repositioned");
-          messagesArea.style.transition = "none";
-          messagesArea.style.top = originalPosition.top || "40%";
-          messagesArea.style.left = originalPosition.left || "61%";
-          messagesArea.style.right = "auto";
-          messagesArea.style.bottom = "auto";
-          messagesArea.style.transform =
-            originalPosition.transform || "translateX(-50%)";
-          messagesArea.style.maxWidth = originalPosition.maxWidth || "95%";
-          messagesArea.style.width = "auto";
-          messagesArea.style.height = "auto"; // Voltar para auto
-          messagesArea.style.position = originalPosition.position || "fixed";
-          messagesArea.style.opacity = "1";
-
-          // Restaurar outros estilos
-          resetMessagesContainerStyles(messagesContainer);
-
-          console.log(
-            "[repositionMessagesArea] Posição original restaurada imediatamente"
-          );
-        }
-
-        return true;
-      } catch (error) {
-        console.error(
-          "[repositionMessagesArea] Erro ao restaurar posição:",
-          error
-        );
-        return false;
-      }
+    // Se estiver reposicionando, adicione a classe, senão remova
+    if (reposition) {
+      messagesArea.classList.add("repositioned");
     } else {
-      // Posição padrão se não houver dados salvos
       messagesArea.classList.remove("repositioned");
-      messagesArea.style.position = "fixed";
-      messagesArea.style.top = "40%";
-      messagesArea.style.left = "61%";
-      messagesArea.style.right = "auto";
-      messagesArea.style.bottom = "auto";
-      messagesArea.style.transform = "translateX(-50%)";
-      messagesArea.style.maxWidth = "95%";
-      messagesArea.style.width = "auto";
-      messagesArea.style.height = "auto"; // Deixar altura como auto
-
-      resetMessagesContainerStyles(messagesContainer);
-
-      return true;
     }
+
+    console.log(
+      `[repositionMessagesArea] Posicionamento imediato - sempre em left: 50%, top: 40%`
+    );
   }
+
+  // Resetar estilos do container de mensagens
+  resetMessagesContainerStyles(messagesContainer);
+
+  return true;
 }
 
 /**
@@ -583,93 +499,6 @@ function resetMessagesContainerStyles(messagesContainer) {
     message.style.overflowWrap = "";
     message.style.wordBreak = "";
   });
-}
-
-/**
- * Ajusta a altura da área de mensagens para não sobrepor o mood-icon
- * @param {HTMLElement} messagesArea - O elemento do assistant-messages
- */
-function adjustMessagesHeightForMoodIcon(messagesArea) {
-  if (!messagesArea) return;
-
-  // Obter referência ao ícone de humor
-  const moodIcon = document.querySelector(".mood-icon");
-  if (!moodIcon) return;
-
-  const messagesContainer = messagesArea.querySelector(".messages-area");
-  if (!messagesContainer) return;
-
-  // Obter posições e dimensões
-  const moodIconRect = moodIcon.getBoundingClientRect();
-  const inputArea = document.getElementById("assistant-input-area");
-  const inputAreaRect = inputArea
-    ? inputArea.getBoundingClientRect()
-    : { top: window.innerHeight - 80 };
-
-  // Calcular a posição correta em relação ao mood-icon
-  if (messagesArea.classList.contains("repositioned")) {
-    // Remover classes que podem estar causando problemas de altura
-    messagesContainer.classList.remove("height-adjusted-for-mood-icon");
-
-    // Posicionar ao lado do mood-icon com distância igual à do input-area
-    const moodIconBottom = moodIconRect.bottom;
-    const distanceFromInput = window.innerHeight - inputAreaRect.top;
-
-    // AJUSTE: Aumentar a margem à direita para 35px (antes era 15px) para afastar mais
-    // E adicionar cálculo para evitar que fique fora da tela
-    const availableSpace = window.innerWidth - moodIconRect.right;
-    const idealDistance = 35; // Aumentado de 15px para 35px
-    const safeDistance = Math.min(idealDistance, availableSpace - 10);
-
-    messagesArea.style.position = "fixed";
-    messagesArea.style.bottom = `${distanceFromInput + 20}px`;
-    messagesArea.style.left = `61%`; // Aumentado o espaçamento
-    messagesArea.style.right = "auto";
-    messagesArea.style.top = "auto";
-
-    // Definir uma largura apropriada para que o elemento não ocupe muito espaço
-    messagesArea.style.width = "450px";
-    messagesArea.style.maxWidth = `${Math.min(
-      450,
-      window.innerWidth - moodIconRect.right - safeDistance - 0
-    )}px`;
-
-    // Altura total sem limitações
-    messagesContainer.style.maxHeight = `${
-      window.innerHeight - moodIconBottom - 30
-    }px`;
-    messagesContainer.style.overflowY = "auto";
-    messagesContainer.style.display = "block";
-    messagesContainer.style.width = "100%";
-    messagesContainer.style.opacity = "1";
-
-    // Adicionar classe de controle personalizada
-    messagesContainer.classList.add("fully-visible");
-
-    console.log(
-      `[adjustMessagesHeightForMoodIcon] Reposicionado à direita do mood-icon com espaçamento aumentado`
-    );
-  } else {
-    // Restaurar configurações originais
-    messagesContainer.classList.remove("fully-visible");
-    messagesContainer.style.maxHeight = "";
-    messagesContainer.style.overflowY = "";
-  }
-
-  // Garantir que todas as mensagens sejam completamente visíveis
-  const messages = messagesContainer.querySelectorAll(".message");
-  if (messages.length > 0 && messagesArea.classList.contains("repositioned")) {
-    messages.forEach((message) => {
-      message.style.maxWidth = "100%";
-      message.style.width = "auto";
-      message.style.overflowWrap = "break-word";
-      message.style.wordBreak = "break-word";
-      message.style.display = "block";
-      message.style.opacity = "1";
-    });
-  }
-
-  return messagesArea;
 }
 
 /**
@@ -712,7 +541,10 @@ export function setupMessagesHeightObserver() {
   const observer = new MutationObserver((mutations) => {
     const messagesArea = document.getElementById("assistant-messages");
     if (messagesArea && messagesArea.classList.contains("repositioned")) {
-      adjustMessagesHeightForMoodIcon(messagesArea);
+      // Não fazemos nada aqui além de garantir que a posição seja mantida
+      messagesArea.style.left = "50%";
+      messagesArea.style.top = "40%";
+      messagesArea.style.transform = "translateX(-50%)";
     }
   });
 
@@ -731,23 +563,16 @@ export function setupMessagesHeightObserver() {
   // Também observar quando a janela é redimensionada
   window.addEventListener("resize", () => {
     const messagesArea = document.getElementById("assistant-messages");
-    if (messagesArea && messagesArea.classList.contains("repositioned")) {
-      adjustMessagesHeightForMoodIcon(messagesArea);
-    }
-  });
-
-  // Iniciar o observador ao carregar a página
-  document.addEventListener("DOMContentLoaded", () => {
-    const messagesArea = document.getElementById("assistant-messages");
-    if (messagesArea && messagesArea.classList.contains("repositioned")) {
-      adjustMessagesHeightForMoodIcon(messagesArea);
+    if (messagesArea) {
+      messagesArea.style.left = "50%";
+      messagesArea.style.top = "40%";
+      messagesArea.style.transform = "translateX(-50%)";
     }
   });
 
   // Retornar função para desconectar quando necessário
   return () => observer.disconnect();
 }
-
 // Chamar a função de setup imediatamente
 setupMessagesHeightObserver();
 

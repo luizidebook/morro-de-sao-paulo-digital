@@ -1,64 +1,108 @@
+import { navigationState } from "../navigationState/navigationStateManager.js";
+import { map } from "../../map/map-controls.js";
+import { formatDistance } from "../../navigation/navigationInstructions/routeProcessor.js";
+import {
+  estimateRemainingTime,
+  formatDuration,
+} from "../navigationController/navigationController.js";
+import { updateInstructionBanner } from "../navigationUi/bannerUI.js";
+
 /**
  * Atualiza a visualização da rota, apagando o caminho já percorrido
  * @param {Object} currentPosition - Posição atual do usuário
  * @param {Array} routeCoordinates - Coordenadas completas da rota
  * @param {number} progress - Progresso atual (0-100%)
+ * @param {Function} progressUpdater - Função para atualizar a barra de progresso
  */
 export function updateRouteDisplay(
   currentPosition,
   routeCoordinates,
-  progress
+  progress,
+  progressUpdater
 ) {
-  // Se não existe rota ou posição, não fazer nada
-  if (!routeCoordinates || !routeCoordinates.length || !currentPosition) return;
+  try {
+    // Se não existe rota ou posição, não fazer nada
+    if (!routeCoordinates || !routeCoordinates.length || !currentPosition) {
+      console.warn(
+        "[updateRouteDisplay] Dados insuficientes para atualizar rota"
+      );
+      return;
+    }
 
-  // Converter coordenadas se necessário
-  const normalizedRoute = routeCoordinates.map((coord) => {
-    if (Array.isArray(coord)) return coord;
-    return [coord.lat || coord.latitude, coord.lng || coord.longitude];
-  });
+    // Verificar se o mapa está disponível
+    if (typeof map === "undefined" || !map) {
+      console.error("[updateRouteDisplay] Mapa não disponível");
+      return;
+    }
 
-  // Encontrar o ponto mais próximo da rota
-  const closestPointIndex = findClosestPointOnRoute(
-    [currentPosition.latitude, currentPosition.longitude],
-    normalizedRoute
-  );
+    // Converter coordenadas para formato esperado pelo Leaflet
+    const normalizedRoute = routeCoordinates.map((coord) => {
+      if (Array.isArray(coord)) return coord;
+      return [coord.lat || coord.latitude, coord.lng || coord.longitude];
+    });
 
-  if (closestPointIndex === -1) return;
+    // Encontrar o ponto mais próximo da rota
+    const closestPointIndex = findClosestPointOnRoute(
+      [currentPosition.latitude, currentPosition.longitude],
+      normalizedRoute
+    );
 
-  // Dividir a rota em duas partes: concluída e restante
-  const completedRoute = normalizedRoute.slice(0, closestPointIndex + 1);
-  const remainingRoute = normalizedRoute.slice(closestPointIndex);
+    if (closestPointIndex === -1) {
+      console.warn(
+        "[updateRouteDisplay] Não foi possível encontrar ponto próximo na rota"
+      );
+      return;
+    }
 
-  // Juntar o último ponto concluído com a posição atual para continuidade
-  completedRoute.push([currentPosition.latitude, currentPosition.longitude]);
+    // Dividir a rota em duas partes: concluída e restante
+    const completedRoute = normalizedRoute.slice(0, closestPointIndex + 1);
+    const remainingRoute = normalizedRoute.slice(closestPointIndex);
 
-  // Remover rota anterior
-  if (window.currentRoute) {
-    map.removeLayer(window.currentRoute);
+    // Juntar o último ponto concluído com a posição atual para continuidade
+    completedRoute.push([currentPosition.latitude, currentPosition.longitude]);
+
+    // Remover rota anterior
+    if (window.currentRoute) {
+      map.removeLayer(window.currentRoute);
+    }
+
+    if (window.completedRoute) {
+      map.removeLayer(window.completedRoute);
+    }
+
+    // Adicionar rota concluída com estilo diferente (mais fraca/apagada)
+    window.completedRoute = L.polyline(completedRoute, {
+      color: "#bbbbbb", // Cinza claro
+      weight: 4,
+      opacity: 0.6,
+      lineCap: "round",
+      lineJoin: "round",
+      dashArray: "5,10", // Linha tracejada
+    }).addTo(map);
+
+    // Adicionar rota restante
+    window.currentRoute = L.polyline(remainingRoute, {
+      color: "#3b82f6", // Azul original
+      weight: 5,
+      opacity: 0.8,
+      lineCap: "round",
+      lineJoin: "round",
+    }).addTo(map);
+
+    // Usar o callback fornecido para atualizar a barra de progresso
+    if (typeof progressUpdater === "function") {
+      progressUpdater(progress);
+    } else {
+      console.warn(
+        "[updateRouteDisplay] Função progressUpdater não disponível"
+      );
+    }
+
+    return true;
+  } catch (error) {
+    console.error("[updateRouteDisplay] Erro ao atualizar rota:", error);
+    return false;
   }
-
-  // Adicionar rota concluída com estilo diferente (mais fraca/apagada)
-  window.completedRoute = L.polyline(completedRoute, {
-    color: "#bbbbbb", // Cinza claro
-    weight: 4,
-    opacity: 0.6,
-    lineCap: "round",
-    lineJoin: "round",
-    dashArray: "5,10", // Linha tracejada
-  }).addTo(map);
-
-  // Adicionar rota restante
-  window.currentRoute = L.polyline(remainingRoute, {
-    color: "#3b82f6", // Azul original
-    weight: 5,
-    opacity: 0.8,
-    lineCap: "round",
-    lineJoin: "round",
-  }).addTo(map);
-
-  // Atualizar barra de progresso
-  updateProgressBar(progress);
 }
 
 /**
@@ -66,74 +110,101 @@ export function updateRouteDisplay(
  * @param {Object} position - Posição atual do usuário
  */
 export function updateNavigationInstructions(position) {
-  if (!position || !navigationState.isActive) return;
-
-  const instructions = navigationState.instructions;
-  if (!instructions || !instructions.length) return;
-
-  const currentStepIndex = navigationState.currentStepIndex;
-  let nextStepIndex = currentStepIndex + 1;
-
-  // Verificar se chegamos no final das instruções
-  if (nextStepIndex >= instructions.length) {
-    checkDestinationArrival(position.latitude, position.longitude);
+  if (!position || !navigationState || !navigationState.isActive) {
     return;
   }
 
-  const nextStep = instructions[nextStepIndex];
-  if (!nextStep) return;
-
-  // Calcular distância até a próxima instrução
-  const distanceToNextStep = calculateDistance(
-    position.latitude,
-    position.longitude,
-    nextStep.latitude || nextStep.lat,
-    nextStep.longitude || nextStep.lon || nextStep.lng
-  );
-
-  // Atualizar distância na instrução atual
-  const currentStep = instructions[currentStepIndex];
-  if (currentStep) {
-    currentStep.formattedDistance = formatDistance(distanceToNextStep);
-    currentStep.remainingDistance = distanceToNextStep;
-
-    // Atualizar o banner com dados atualizados
-    updateInstructionBanner(currentStep);
+  const instructions = navigationState.instructions;
+  if (!Array.isArray(instructions) || instructions.length === 0) {
+    return;
   }
 
-  // Verificar se está próximo da próxima instrução para alertar o usuário
-  if (distanceToNextStep <= 50) {
-    // Destacar o banner se ainda não tiver sido destacado para esta instrução
-    if (!navigationState.notifiedTurns[nextStepIndex]) {
-      flashBanner(true);
+  const currentIndex = navigationState.currentStepIndex || 0;
+  const currentInstruction = instructions[currentIndex];
 
-      // Alerta sonoro ou vibratório
-      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+  if (!currentInstruction) {
+    return;
+  }
 
-      // Marcar como notificado
-      navigationState.notifiedTurns[nextStepIndex] = true;
+  try {
+    // Verificar se já temos coordenadas da instrução atual
+    const hasCoords = !!(
+      (currentInstruction.latitude || currentInstruction.lat) &&
+      (currentInstruction.longitude ||
+        currentInstruction.lon ||
+        currentInstruction.lng)
+    );
 
-      // Alertar vocalmente se estiver muito próximo
-      if (distanceToNextStep <= 20 && typeof speak === "function") {
-        speak(
-          nextStep.simplifiedInstruction || "Prepare-se para a próxima manobra"
+    if (!hasCoords) {
+      console.warn(
+        "[updateNavigationInstructions] Instrução sem coordenadas:",
+        currentIndex
+      );
+      return;
+    }
+
+    // Calcular distância até a próxima instrução
+    const lat = currentInstruction.latitude || currentInstruction.lat;
+    const lon =
+      currentInstruction.longitude ||
+      currentInstruction.lon ||
+      currentInstruction.lng;
+
+    // Distância até o ponto atual da instrução
+    const distanceToInstruction = calculateDistance(
+      position.latitude,
+      position.longitude,
+      lat,
+      lon
+    );
+
+    // Atualizar a distância no banner
+    const formattedDistance = formatDistance(distanceToInstruction);
+
+    // Obter o tempo estimado para esta distância (considera velocidade média de caminhada)
+    const estimatedTime = estimateRemainingTime(distanceToInstruction);
+    const formattedTime = formatDuration(estimatedTime);
+
+    // Atualizar banner com informação de distância
+    updateInstructionBanner({
+      instruction:
+        currentInstruction.simplifiedInstruction ||
+        currentInstruction.instruction,
+      type:
+        currentInstruction.type ||
+        getInstructionType(currentInstruction.instruction),
+      remainingDistance: formattedDistance,
+      estimatedTime: formattedTime,
+    });
+
+    // Verificar se estamos perto o suficiente para avançar para a próxima instrução
+    // (tipicamente 15m, mas pode variar com base na precisão do GPS)
+    const proximityThreshold = position.accuracy
+      ? Math.max(15, position.accuracy * 0.8)
+      : 15;
+
+    if (distanceToInstruction <= proximityThreshold) {
+      // Só avança se houver uma próxima instrução disponível
+      if (currentIndex < instructions.length - 1) {
+        console.log(
+          `[updateNavigationInstructions] Chegou próximo à instrução ${currentIndex}, avançando para próxima`
         );
+        navigationState.currentStepIndex = currentIndex + 1;
+
+        // Mostrar próxima instrução
+        const nextInstruction = instructions[currentIndex + 1];
+        if (nextInstruction) {
+          displayNavigationStep(nextInstruction, true);
+        }
       }
     }
-  }
-
-  // Avançar para a próxima instrução se muito próximo
-  if (distanceToNextStep <= 15) {
-    navigationState.currentStepIndex = nextStepIndex;
-    displayNavigationStep(nextStep, true);
-
-    // Anunciar nova instrução
-    if (typeof speak === "function") {
-      speak(nextStep.simplifiedInstruction || "Nova manobra");
-    }
+  } catch (error) {
+    console.error(
+      "[updateNavigationInstructions] Erro ao atualizar instruções:",
+      error
+    );
   }
 }
-
 /**
  * Garante que todas as instruções tenham coordenadas válidas
  * @param {Array} instructions - Array de instruções da rota
@@ -322,7 +393,7 @@ export function monitorApproachingTurn(
  * @param {Object} routeData - Dados GeoJSON da rota
  * @returns {Array} Array de coordenadas normalizadas no formato [{lat, lng}]
  */
-export function extractRouteCoordinates(routeData) {
+function extractRouteCoordinates(routeData) {
   try {
     // Verificar validade dos dados
     if (!routeData || !routeData.features || !routeData.features.length) {
@@ -379,4 +450,204 @@ export function extractRouteCoordinates(routeData) {
     );
     return [];
   }
+}
+
+// Garantir que a função seja exportada
+export { extractRouteCoordinates };
+
+/**
+ * Encontra o ponto mais próximo em uma rota a partir de uma posição dada
+ * @param {Array} position - Posição atual [latitude, longitude]
+ * @param {Array} route - Array de pontos da rota, cada um como [latitude, longitude]
+ * @returns {number} - Índice do ponto mais próximo no array da rota, ou -1 se não encontrado
+ */
+export function findClosestPointOnRoute(position, route) {
+  try {
+    // Verificações de segurança
+    if (
+      !position ||
+      position.length < 2 ||
+      !Array.isArray(route) ||
+      route.length === 0
+    ) {
+      console.warn("[findClosestPointOnRoute] Parâmetros inválidos:", {
+        position,
+        routeLength: route?.length || 0,
+      });
+      return -1;
+    }
+
+    // Extrair coordenadas da posição atual
+    const [currentLat, currentLon] = position;
+
+    // Verificar validade das coordenadas
+    if (!isValidCoordinate(currentLat, currentLon)) {
+      console.warn(
+        "[findClosestPointOnRoute] Coordenadas de posição inválidas"
+      );
+      return -1;
+    }
+
+    // Encontrar o ponto mais próximo
+    let closestPointIndex = -1;
+    let minDistance = Infinity;
+
+    for (let i = 0; i < route.length; i++) {
+      const point = route[i];
+
+      // Verificar formato do ponto (pode ser [lat, lon] ou {lat, lng})
+      const pointLat = Array.isArray(point)
+        ? point[0]
+        : point.lat || point.latitude;
+      const pointLon = Array.isArray(point)
+        ? point[1]
+        : point.lng || point.lon || point.longitude;
+
+      // Pular pontos inválidos
+      if (!isValidCoordinate(pointLat, pointLon)) {
+        continue;
+      }
+
+      // Calcular distância Haversine
+      const distance = calculateDistance(
+        currentLat,
+        currentLon,
+        pointLat,
+        pointLon
+      );
+
+      // Atualizar se encontrarmos um ponto mais próximo
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestPointIndex = i;
+      }
+    }
+
+    return closestPointIndex;
+  } catch (error) {
+    console.error("[findClosestPointOnRoute] Erro:", error);
+    return -1;
+  }
+}
+/**
+ * Determina o próximo ponto relevante para orientação do marcador
+ * @param {Object} currentPosition - Posição atual do usuário
+ * @param {Array} instructions - Array de instruções da navegação
+ * @param {number} currentStepIndex - Índice atual na lista de instruções
+ * @returns {Object|null} - Próximo ponto {latitude, longitude} ou null se não encontrado
+ */
+export function determineNextPoint(
+  currentPosition,
+  instructions,
+  currentStepIndex
+) {
+  // Verificações de segurança
+  if (
+    !currentPosition ||
+    !Array.isArray(instructions) ||
+    instructions.length === 0
+  ) {
+    return null;
+  }
+
+  // Garantir que o índice é válido
+  const index = Math.max(
+    0,
+    Math.min(instructions.length - 1, currentStepIndex)
+  );
+
+  try {
+    // Tentar usar o próximo ponto de instrução se houver
+    if (index + 1 < instructions.length) {
+      const nextInstruction = instructions[index + 1];
+      if (nextInstruction) {
+        // Extrair coordenadas (considerando diferentes formatos)
+        const lat = nextInstruction.latitude || nextInstruction.lat;
+        const lon =
+          nextInstruction.longitude ||
+          nextInstruction.lon ||
+          nextInstruction.lng;
+
+        if (isValidCoordinate(lat, lon)) {
+          return { latitude: lat, longitude: lon };
+        }
+      }
+    }
+
+    // Se não tiver próximo ponto ou for inválido, usar o ponto atual da instrução
+    const currentInstruction = instructions[index];
+    if (currentInstruction) {
+      const lat = currentInstruction.latitude || currentInstruction.lat;
+      const lon =
+        currentInstruction.longitude ||
+        currentInstruction.lon ||
+        currentInstruction.lng;
+
+      if (isValidCoordinate(lat, lon)) {
+        return { latitude: lat, longitude: lon };
+      }
+    }
+
+    // Se nada funcionar e tivermos um destino final, usar ele
+    const lastInstruction = instructions[instructions.length - 1];
+    if (lastInstruction) {
+      const lat = lastInstruction.latitude || lastInstruction.lat;
+      const lon =
+        lastInstruction.longitude || lastInstruction.lon || lastInstruction.lng;
+
+      if (isValidCoordinate(lat, lon)) {
+        return { latitude: lat, longitude: lon };
+      }
+    }
+
+    // Nenhum ponto válido encontrado
+    return null;
+  } catch (error) {
+    console.error(
+      "[determineNextPoint] Erro ao determinar próximo ponto:",
+      error
+    );
+    return null;
+  }
+}
+
+/**
+ * Verifica se as coordenadas são válidas
+ * @param {number} lat - Latitude
+ * @param {number} lon - Longitude
+ * @returns {boolean} - Se as coordenadas são válidas
+ */
+function isValidCoordinate(lat, lon) {
+  return (
+    typeof lat === "number" &&
+    !isNaN(lat) &&
+    typeof lon === "number" &&
+    !isNaN(lon) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lon >= -180 &&
+    lon <= 180
+  );
+}
+
+/**
+ * Calcula a distância entre dois pontos geográficos usando Haversine
+ * @param {number} lat1 - Latitude do primeiro ponto
+ * @param {number} lon1 - Longitude do primeiro ponto
+ * @param {number} lat2 - Latitude do segundo ponto
+ * @param {number} lon2 - Longitude do segundo ponto
+ * @returns {number} - Distância em metros
+ */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3; // Raio da Terra em metros
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }

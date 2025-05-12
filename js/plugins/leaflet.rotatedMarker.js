@@ -90,3 +90,39 @@
 
   console.log("[leaflet.rotatedMarker] Plugin inicializado com sucesso");
 })();
+
+// Adicionar ao leaflet.rotatedMarker.js ou onde a rotação é aplicada
+function applyRotationToMarker(marker, degrees, is3DMode) {
+  if (!marker || typeof degrees !== "number" || isNaN(degrees)) {
+    console.warn("[leaflet.rotatedMarker] Rotação inválida:", degrees);
+    return;
+  }
+
+  try {
+    console.log(
+      `[leaflet.rotatedMarker] Aplicando rotação de ${degrees.toFixed(
+        1
+      )}° ao marcador`
+    );
+
+    const el = marker.getElement();
+    if (!el) return;
+
+    // Adicionar classe para animação suave
+    el.classList.add("rotating");
+
+    // Aplicar rotação diferente para modo 3D
+    if (is3DMode) {
+      // No modo 3D, alinhamos com o mapa
+      el.style.transform = `rotate(${degrees}deg)`;
+    } else {
+      // No modo normal, rotacionamos o ícone
+      el.style.transform = `rotate(${degrees}deg)`;
+    }
+
+    // Armazenar rotação atual para referência
+    marker._bearing = degrees;
+  } catch (error) {
+    console.error("[leaflet.rotatedMarker] Erro ao aplicar rotação:", error);
+  }
+}

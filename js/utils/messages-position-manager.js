@@ -37,6 +37,15 @@ export function initMessagesPositionManager() {
 
     const { action } = event.detail;
 
+    // Manter sempre a posição consistente
+    const messagesArea = document.getElementById("assistant-messages");
+    if (messagesArea) {
+      // Garantir posição consistente
+      messagesArea.style.left = "50%";
+      messagesArea.style.top = "40%";
+      messagesArea.style.transform = "translateX(-50%)";
+    }
+
     if (REPOSITION_ACTIONS.includes(action)) {
       console.log(
         `[MessagesPositionManager] Ação '${action}' detectada, reposicionando mensagens`

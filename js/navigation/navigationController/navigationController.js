@@ -7,8 +7,6 @@
  */
 
 // Importações organizadas por categoria e ordem alfabética:
-
-// Core modules
 import { map, plotRouteOnMap, userLocation } from "../../map/map-controls.js";
 import {
   navigationState,
@@ -18,6 +16,7 @@ import {
 import { repositionMessagesArea } from "../../utils/ui-position.js";
 import { setupInitialMapOrientation } from "../../map/map-orientation.js";
 import { processRouteInstructions } from "../navigationInstructions/routeProcessor.js";
+
 import {
   adjustUIForNavigation,
   setupNavigationUIObserver,
@@ -29,6 +28,8 @@ import {
   ensureCoordinatesInInstructions,
   monitorApproachingTurn,
   extractRouteCoordinates,
+  findClosestPointOnRoute,
+  determineNextPoint,
 } from "../../navigation/navigationInstructions/routeProcessorUtils.js";
 import { startRotationMonitor } from "../../map/map-rotation-monitor.js";
 import {
@@ -39,6 +40,7 @@ import {
 import { startPositionTracking } from "../navigationUserLocation/user-location.js";
 import {
   recalculationInProgress,
+  formatDistance,
   isRecalculationInProgress, // Opcionalmente, pode importar a função também
 } from "../navigationInstructions/routeProcessor.js";
 // UI components
@@ -61,6 +63,16 @@ import { getGeneralText } from "../../i18n/translatePageContent.js";
 import { showNotification } from "../../utils/notifications.js";
 import { speak } from "../../utils/voice/voiceSystem.js";
 import { showNavigationLoading } from "../navigationUi/bannerUI.js";
+import {
+  enableNavigation3D,
+  disableNavigation3D,
+  updateRouteDataIn3D,
+  updateUserPositionIn3D,
+  isNavigation3DActive,
+} from "./navigation3D.js";
+import { hideNavigationLoading } from "../navigationUi/bannerUI.js";
+// Adicionar ao estado de navegação
+navigationState.is3DModeEnabled = false; // Controle se o modo 3D está habilitado
 
 // Adicionar em navigationController.js
 import {
@@ -140,6 +152,61 @@ function usePredictedLocationIfNeeded(options = {}) {
   }
 
   return false;
+}
+
+/**
+ * Atualiza a barra de progresso visual da navegação
+ * @param {number} percentage - Porcentagem de progresso (0-100)
+ * @returns {boolean} - Indica se a operação foi bem-sucedida
+ */
+export function updateProgressBar(percentage) {
+  try {
+    // Normalizar o valor para garantir que esteja entre 0-100
+    let normalizedPercentage = Math.max(0, Math.min(100, percentage));
+
+    // Garantir que seja sempre visível (mínimo 0.1%)
+    normalizedPercentage = Math.max(0.1, normalizedPercentage);
+
+    // Obter o elemento da barra de progresso
+    const progressBarEl =
+      document.getElementById("progress") ||
+      document.querySelector(".progress-bar");
+
+    if (!progressBarEl) {
+      console.warn(
+        "[updateProgressBar] Elemento de barra de progresso não encontrado"
+      );
+      return false;
+    }
+
+    // Atualizar a largura com valor percentual
+    progressBarEl.style.width = `${normalizedPercentage}%`;
+
+    // Atualizar atributos ARIA para acessibilidade
+    progressBarEl.setAttribute(
+      "aria-valuenow",
+      Math.round(normalizedPercentage)
+    );
+
+    // Atualizar o texto de progresso se existir
+    const progressTextEl = document.getElementById("progress-text");
+    if (progressTextEl) {
+      progressTextEl.textContent = `${Math.round(normalizedPercentage)}%`;
+    }
+
+    console.log(
+      `[updateProgressBar] Progresso atualizado para ${normalizedPercentage.toFixed(
+        1
+      )}%`
+    );
+    return true;
+  } catch (error) {
+    console.error(
+      "[updateProgressBar] Erro ao atualizar barra de progresso:",
+      error
+    );
+    return false;
+  }
 }
 
 /**
@@ -320,13 +387,33 @@ export function runNavigationDiagnostic() {
 /**
  * Inicia a navegação para um destino específico
  * @param {Object} destination - Destino para navegação
+ * @param {Object} options - Opções adicionais para a navegação
+ * @param {boolean} options.enable3D - Se deve ativar o modo 3D
  * @returns {Promise<boolean>} - Sucesso da operação
  */
-export async function startNavigation(destination) {
+export async function startNavigation(destination, options = {}) {
   try {
     console.group("[startNavigation] Iniciando fluxo de navegação");
+    function initializeNavigationState(route, instructions) {
+      navigationState.isActive = true;
+      navigationState.route = route;
+      navigationState.instructions = instructions;
+      navigationState.currentStepIndex = 0; // Inicializar com o primeiro passo
+      navigationState.totalDistance = calculateTotalRouteDistance(route);
+      options = {
+        enable3D: true, // Forçar modo 3D como padrão
+        ...options,
+      };
+    }
+    // Verificar se navigationState existe
+    if (!navigationState) {
+      console.error("[startNavigation] Estado de navegação não inicializado");
+      return false;
+    }
+
     // Notificar que a navegação está começando para ajustar a UI
     adjustUIForNavigation(true);
+
     // Verificar e inicializar componentes
     ensureNavigationComponents();
 
@@ -346,12 +433,13 @@ export async function startNavigation(destination) {
     navigationState.currentStepIndex = 0;
     navigationState.arrivalNotified = false;
     navigationState.deviationDetected = false;
-    navigationState.routeProgress = 0; // IMPORTANTE: Resetar progresso ao iniciar
+    navigationState.routeProgress = 0;
     navigationState.instructions = [];
     navigationState.routeData = null;
     navigationState.lastProcessedPosition = null;
     navigationState.lastUpdateTime = Date.now();
-    navigationState.notifiedTurns = {}; // Reset das notificações de curvas
+    navigationState.notifiedTurns = {};
+    navigationState.is3DModeEnabled = options.enable3D || false;
 
     // Inicializar objeto de desempenho para diagnóstico
     navigationState.performance = {
@@ -371,8 +459,10 @@ export async function startNavigation(destination) {
     console.log("2. Controles inicializados");
 
     // Inicializar sistema avançado de localização
-    initAdvancedLocationComponents();
-    console.log("3. Sistema de localização avançado inicializado");
+    if (typeof initAdvancedLocationComponents === "function") {
+      initAdvancedLocationComponents();
+      console.log("3. Sistema de localização avançado inicializado");
+    }
 
     // Verificar se temos localização do usuário
     if (!userLocation || !userLocation.latitude || !userLocation.longitude) {
@@ -386,12 +476,19 @@ export async function startNavigation(destination) {
       );
 
       try {
-        // Obter localização via sistema avançado
-        const location = await getBestLocation({
-          maxWaitTime: 10000,
-          desiredAccuracy: 50,
-          timeoutStrategy: "best-available",
-        });
+        // Obter localização via sistema avançado ou padrão
+        const location =
+          typeof getBestLocation === "function"
+            ? await getBestLocation({
+                maxWaitTime: 10000,
+                desiredAccuracy: 50,
+                timeoutStrategy: "best-available",
+              })
+            : await getCurrentLocation();
+
+        if (!location) {
+          throw new Error("Não foi possível obter sua localização");
+        }
 
         // Atualizar localização global
         userLocation = location;
@@ -416,7 +513,11 @@ export async function startNavigation(destination) {
         });
 
         // Continuar com inicialização da rota
-        return await initializeRouteWithLocation(location, destination);
+        return await initializeRouteWithLocation(
+          location,
+          destination,
+          options
+        );
       } catch (error) {
         console.error("[startNavigation] Erro ao obter localização:", error);
 
@@ -441,12 +542,19 @@ export async function startNavigation(destination) {
       lon: userLocation.longitude,
     });
 
-    return await initializeRouteWithLocation(userLocation, destination);
+    return await initializeRouteWithLocation(
+      userLocation,
+      destination,
+      options
+    );
   } catch (error) {
     console.error("[startNavigation] Erro crítico:", error);
 
     // Limpar estado em caso de falha
-    navigationState.isActive = false;
+    if (navigationState) {
+      navigationState.isActive = false;
+    }
+
     hideNavigationLoading();
 
     // Notificar erro
@@ -466,9 +574,14 @@ export async function startNavigation(destination) {
  * Inicializa a rota com uma localização conhecida do usuário
  * @param {Object} userLocation - Localização do usuário
  * @param {Object} destination - Destino para navegação
+ * @param {Object} options - Opções adicionais para a navegação
  * @returns {Promise<boolean>} - Sucesso da operação
  */
-async function initializeRouteWithLocation(userLocation, destination) {
+async function initializeRouteWithLocation(
+  userLocation,
+  destination,
+  options = {}
+) {
   try {
     // Validar dados de entrada
     if (!userLocation || !userLocation.latitude || !userLocation.longitude) {
@@ -505,76 +618,150 @@ async function initializeRouteWithLocation(userLocation, destination) {
     }
 
     console.log("5. Rota calculada com sucesso");
+    // Após o cálculo da rota bem-sucedido:
+    if (routeData) {
+      // Sempre definir 3D como habilitado
+      navigationState.is3DModeEnabled = true;
+
+      // Garantir que a função seja chamada e esperar pela conclusão
+      try {
+        if (typeof enableNavigation3D === "function") {
+          console.log("[initializeRouteWithLocation] Ativando navegação em 3D");
+          await enableNavigation3D({
+            navigationHeading: calculateInitialHeading(routeData),
+            pitch: 60,
+            animate: true,
+          });
+
+          // Verificar se foi ativado corretamente
+          if (!isNavigation3DActive()) {
+            console.warn(
+              "[initializeRouteWithLocation] Falha na ativação 3D, tentando novamente"
+            );
+            // Segunda tentativa após um pequeno delay
+            setTimeout(() => {
+              enableNavigation3D({
+                navigationHeading: calculateInitialHeading(routeData),
+                pitch: 60,
+              });
+            }, 300);
+          }
+        } else {
+          console.error(
+            "[initializeRouteWithLocation] Função enableNavigation3D não disponível"
+          );
+        }
+      } catch (err) {
+        console.error(
+          "[initializeRouteWithLocation] Erro ao ativar modo 3D:",
+          err
+        );
+      }
+    }
 
     // Salvar dados da rota
     navigationState.routeData = routeData;
     setLastRouteData(routeData);
 
-    // Processar instruções da rota
-    const processedInstructions = await processRouteInstructions(
-      routeData,
-      navigationState.lang
-    );
+    try {
+      // Processar instruções da rota
+      const processedInstructions = await processRouteInstructions(
+        routeData,
+        navigationState.lang
+      );
 
-    if (!processedInstructions || !Array.isArray(processedInstructions)) {
+      if (!processedInstructions || !Array.isArray(processedInstructions)) {
+        throw new Error("Falha ao processar instruções da rota");
+      }
+
+      // Normalizar instruções e salvá-las
+      const normalizedInstructions = normalizeInstructions(
+        processedInstructions
+      );
+      navigationState.instructions = normalizedInstructions;
+
+      // Calcular distância total
+      const totalDistance = routeData.properties?.summary?.distance || 0;
+      navigationState.totalRouteDistance = totalDistance;
+
+      // Inicializar dados de progresso
+      navigationState.progress = {
+        totalDistance: totalDistance,
+        completedDistance: 0,
+        percentage: 0,
+        lastUpdated: Date.now(),
+      };
+
+      // Criar interface de navegação
+      createNavigationBanner();
+      showInstructionBanner(true);
+      addMinimizeButtonHandler();
+
+      // Resetar barra de progresso
+      updateProgressBar(0);
+
+      console.log("6. Interface de navegação criada");
+
+      // Exibir primeira instrução
+      if (normalizedInstructions.length > 0) {
+        displayNavigationStep(normalizedInstructions[0], true);
+      }
+
+      // Adicionar controles e iniciar monitoramentos
+      addNavigationControls();
+      startPositionTracking();
+      monitorUserState();
+      document.body.classList.add("navigation-active");
+
+      // Configurar atualizações e checagens
+      setupRealTimeUpdates();
+      setupBannerIntegrityCheck();
+      setupInitialMarkerOrientation();
+
+      // Centralizar mapa
+      updateMapWithUserLocation();
+
+      // Se o modo 3D está habilitado nas opções ou no estado
+      const use3D = options.enable3D || navigationState.is3DModeEnabled;
+
+      if (use3D) {
+        navigationState.is3DModeEnabled = true;
+
+        // Ativar navegação 3D após o cálculo da rota
+        if (routeData && typeof enableNavigation3D === "function") {
+          console.log("[startNavigation] Ativando navegação em 3D");
+          try {
+            enableNavigation3D({
+              navigationHeading: calculateInitialHeading(routeData),
+              pitch: 60,
+            });
+          } catch (err3d) {
+            console.error("[startNavigation] Erro ao ativar modo 3D:", err3d);
+            // Continuar sem 3D em caso de erro
+            navigationState.is3DModeEnabled = false;
+          }
+        }
+      }
+
+      // Inicializar navegação em tempo real com posição atual
+      updateRealTimeNavigation(userLocation);
+
+      hideNavigationLoading();
+      console.log("7. Navegação iniciada completamente");
+
+      // Efeito visual para confirmação
+      if (typeof pulseUserMarker === "function") {
+        pulseUserMarker("normal", 2000);
+      }
+
+      return true;
+    } catch (instructionsError) {
+      console.error(
+        "[initializeRouteWithLocation] Erro ao processar instruções:",
+        instructionsError
+      );
       throw new Error("Falha ao processar instruções da rota");
     }
-
-    // Normalizar instruções e salvá-las
-    const normalizedInstructions = normalizeInstructions(processedInstructions);
-    navigationState.instructions = normalizedInstructions;
-
-    // Calcular distância total
-    const totalDistance = routeData.properties?.summary?.distance || 0;
-    navigationState.totalRouteDistance = totalDistance;
-
-    // Inicializar dados de progresso
-    navigationState.progress = {
-      totalDistance: totalDistance,
-      completedDistance: 0,
-      percentage: 0,
-      lastUpdated: Date.now(),
-    };
-
-    // Criar interface de navegação
-    createNavigationBanner();
-    showInstructionBanner(true);
-    addMinimizeButtonHandler();
-
-    // Resetar barra de progresso
-    updateProgressBar(0);
-
-    console.log("6. Interface de navegação criada");
-
-    // Exibir primeira instrução
-    if (normalizedInstructions.length > 0) {
-      displayNavigationStep(normalizedInstructions[0], true);
-    }
-
-    // Adicionar controles e iniciar monitoramentos
-    addNavigationControls();
-    startPositionTracking();
-    monitorUserState();
-    document.body.classList.add("navigation-active");
-
-    // Configurar atualizações e checagens
-    setupRealTimeUpdates();
-    setupBannerIntegrityCheck();
-    setupInitialMarkerOrientation();
-
-    // Centralizar mapa
-    updateMapWithUserLocation();
-
-    // Inicializar navegação em tempo real com posição atual
-    updateRealTimeNavigation(userLocation);
-
-    hideNavigationLoading();
-    console.log("7. Navegação iniciada completamente");
-
-    // Efeito visual para confirmação
-    pulseUserMarker("normal", 2000);
-
-    return true;
   } catch (error) {
     console.error("[initializeRouteWithLocation] Erro:", error);
 
@@ -1321,70 +1508,6 @@ function calculateRouteProgress(
 }
 
 /**
- * Atualiza a barra de progresso visual com animação suave
- * @param {Number} progress - Progresso como percentual (0-100)
- */
-function updateProgressBar(progress) {
-  try {
-    // Garantir valor numérico válido
-    const validProgress = Math.max(
-      0.1,
-      Math.min(100, parseFloat(progress) || 0.1)
-    );
-
-    // Encontrar elemento da barra de progresso
-    const progressBar =
-      document.querySelector(".progress-bar") ||
-      document.getElementById("progress");
-
-    if (!progressBar) {
-      console.warn(
-        "[updateProgressBar] Barra de progresso não encontrada, criando..."
-      );
-
-      // Tentar criar a barra de progresso usando ensureProgressBarExists
-      if (typeof ensureProgressBarExists === "function") {
-        ensureProgressBarExists();
-        // Tentar novamente após criar
-        setTimeout(() => updateProgressBar(validProgress), 50);
-      }
-      return false;
-    }
-
-    // Aplicar largura com base na porcentagem
-    progressBar.style.width = `${validProgress}%`;
-
-    // Atualizar atributo aria para acessibilidade
-    progressBar.setAttribute("aria-valuenow", validProgress);
-
-    // Adicionar classes visuais para diferentes marcos
-    if (validProgress >= 90) {
-      progressBar.classList.add("almost-complete");
-      progressBar.classList.remove("half-complete");
-    } else if (validProgress >= 50) {
-      progressBar.classList.add("half-complete");
-      progressBar.classList.remove("almost-complete");
-    } else {
-      progressBar.classList.remove("half-complete", "almost-complete");
-    }
-
-    // Atualizar texto de progresso se existir
-    const progressText = document.getElementById("progress-text");
-    if (progressText) {
-      progressText.textContent = `${Math.round(validProgress)}%`;
-    }
-
-    return true;
-  } catch (error) {
-    console.error(
-      "[updateProgressBar] Erro ao atualizar barra de progresso:",
-      error
-    );
-    return false;
-  }
-}
-
-/**
  * Atualiza o progresso da navegação e a barra visual
  * @param {Object} userLocation - Localização atual do usuário
  */
@@ -1437,15 +1560,35 @@ function updateNavigationProgress(userLocation) {
 }
 /**
  * Cancela a navegação ativa
+ * @param {Object} options - Opções de cancelamento
+ * @param {boolean} options.showConfirmation - Se deve mostrar confirmação
+ * @returns {Promise<boolean>} - Sucesso da operação
  */
-export function cancelNavigation(options = {}) {
+export async function cancelNavigation(showConfirmation = true) {
   console.log("[cancelNavigation] Finalizando navegação...");
+
+  // Se confirmação é necessária, perguntar ao usuário
+  if (showConfirmation) {
+    const confirmed = await confirmAction(
+      getGeneralText("cancel_navigation_confirm", navigationState.lang) ||
+        "Deseja realmente cancelar a navegação?"
+    );
+
+    if (!confirmed) {
+      console.log("[cancelNavigation] Cancelamento abortado pelo usuário");
+      return false;
+    }
+  }
+
   // Disparar evento
   dispatchActionEvent("cancelNavigation");
+
   // Notificar que a navegação está terminando para restaurar a UI
   adjustUIForNavigation(false);
+
   // Restaurar posição da área de mensagens
   repositionMessagesArea(false);
+
   // 1. Parar geolocalização contínua
   if (positionWatcherId) {
     navigator.geolocation.clearWatch(positionWatcherId);
@@ -1470,22 +1613,30 @@ export function cancelNavigation(options = {}) {
     window.currentRoute = null;
   }
 
-  // 5. Resetar rotação do mapa
+  // 5. Se o modo 3D está ativo, desativá-lo
+  if (navigationState.is3DModeEnabled && isNavigation3DActive()) {
+    disableNavigation3D();
+  }
+
+  navigationState.is3DModeEnabled = false;
+
+  // 6. Resetar rotação do mapa
   resetMapRotation();
 
-  // 6. Esconder banner de instruções
+  // 7. Esconder banner de instruções
   hideInstructionBanner();
 
-  // 7. Remover classe do body
+  // 8. Remover classe do body
   document.body.classList.remove("navigation-active");
 
-  // 8. Notificar o usuário
+  // 9. Notificar o usuário
   showNotification(
-    getGeneralText("navigation_stop", navigationState.lang),
+    getGeneralText("navigation_stop", navigationState.lang) ||
+      "Navegação finalizada",
     "info"
   );
 
-  // 9. Enviar mensagem para o assistente
+  // 10. Enviar mensagem para o assistente
   appendMessage(
     "assistant",
     "Navegação guiada finalizada. Se precisar de outra rota, é só pedir! 🏁"
@@ -1497,24 +1648,29 @@ export function cancelNavigation(options = {}) {
     navigationState.updateInterval = null;
   }
 
-  if (userStateInterval) {
-    clearInterval(userStateInterval);
-    userStateInterval = null;
-  }
-
-  // Limpar watchers de posição
-  if (positionWatcherId) {
-    navigator.geolocation.clearWatch(positionWatcherId);
-    positionWatcherId = null;
+  // Limpar watchers de posição adicionais
+  if (window.geoLocationWatchId) {
+    navigator.geolocation.clearWatch(window.geoLocationWatchId);
+    window.geoLocationWatchId = null;
   }
 
   // Resetar flags importantes
   recalculationInProgress = false;
 
+  // Limpar objetos de rota no mapa
+  if (window.completedRoute && map) {
+    map.removeLayer(window.completedRoute);
+    window.completedRoute = null;
+  }
+
+  if (window.routeArrows && map) {
+    map.removeLayer(window.routeArrows);
+    window.routeArrows = null;
+  }
+
   console.log("[cancelNavigation] Navegação cancelada com sucesso");
   return true;
 }
-
 export function addNavigationControls() {
   if (navigationState.controlsInitialized) {
     console.log("[addNavigationControls] Controles já inicializados, pulando");
@@ -1711,7 +1867,34 @@ export function displayNavigationStep(step, highlight = true) {
     return false;
   }
 }
+/**
+ * Determina o tipo de instrução baseado no texto da instrução
+ * @param {string} instruction - Texto da instrução
+ * @returns {number} - Código do tipo de instrução
+ */
+export function getInstructionType(instruction) {
+  if (!instruction) return 0;
 
+  const lowerText = instruction.toLowerCase();
+
+  // Códigos comuns para tipos de instrução
+  if (lowerText.includes("turn right")) return 1;
+  if (lowerText.includes("turn left")) return 2;
+  if (lowerText.includes("straight") || lowerText.includes("continue"))
+    return 0;
+  if (lowerText.includes("slight right")) return 6;
+  if (lowerText.includes("slight left")) return 7;
+  if (lowerText.includes("sharp right")) return 3;
+  if (lowerText.includes("sharp left")) return 4;
+  if (lowerText.includes("u-turn")) return 5;
+  if (lowerText.includes("roundabout")) return 8;
+  if (lowerText.includes("exit")) return 9;
+  if (lowerText.includes("arrive") || lowerText.includes("destination"))
+    return 10;
+
+  // Tipo padrão: siga em frente
+  return 0;
+}
 /**
  * Verifica se o usuário chegou ao destino
  * @param {number} userLat - Latitude atual do usuário
@@ -1758,103 +1941,66 @@ export function checkDestinationArrival(userLat, userLon) {
 }
 
 /**
- * Versão integrada da função updateRealTimeNavigation
- * @param {Object} location - Posição atual
- * @param {Object} options - Opções adicionais
+ * Atualiza a navegação em tempo real
+ * @param {Object} position - Posição atual do usuário
  */
-export function updateRealTimeNavigation(location, options = {}) {
-  // Verificações de segurança
-  if (!location || !navigationState.isActive) return;
-
-  // Registrar posição atual
-  navigationState.lastKnownUserPosition = {
-    latitude: location.latitude,
-    longitude: location.longitude,
-    accuracy: location.accuracy,
-    heading: location.heading,
-    timestamp: location.timestamp || Date.now(),
-    isEstimated: options.isEstimated || false,
-  };
-
-  // 1. Atualizar marcador do usuário
-  updateUserMarker(
-    location.latitude,
-    location.longitude,
-    location.heading || 0,
-    location.accuracy
-  );
-
-  // 2. Verificar desvio da rota
-  if (shouldRecalculateRoute(location.latitude, location.longitude)) {
-    recalculateRoute(location);
+export function updateRealTimeNavigation(position) {
+  if (!position || !navigationState.isActive) {
     return;
   }
 
-  // 3. Calcular progresso na rota
-  const routeData = navigationState.routeData;
-  const instructions = navigationState.instructions;
+  try {
+    // Acessar o currentStepIndex do navigationState
+    const currentStepIndex = navigationState.currentStepIndex || 0;
 
-  if (routeData && instructions && instructions.length) {
-    // Garantir que todas as instruções têm coordenadas
-    if (!navigationState._coordinatesEnsured) {
-      navigationState.instructions = ensureCoordinatesInInstructions(
-        instructions,
-        routeData
+    // Atualizar instruções com o índice correto
+    updateNavigationInstructions(position);
+
+    // Atualizar direção do marcador
+    try {
+      const nextPoint = determineNextPoint(
+        position,
+        navigationState.instructions,
+        currentStepIndex // Usar a variável agora definida corretamente
       );
-      navigationState._coordinatesEnsured = true;
-    }
 
-    // Calcular progresso atual
-    const progress = calculateRouteProgress(
-      location,
-      navigationState.instructions,
-      navigationState.currentStepIndex
-    );
-
-    // 4. Atualizar visualização da rota (apagar caminho percorrido)
-    const routeCoordinates = extractRouteCoordinates(routeData);
-    updateRouteDisplay(location, routeCoordinates, progress.percentage);
-
-    // 5. Atualizar instruções em tempo real
-    updateNavigationInstructions(location);
-
-    // 6. Verificar aproximação a curvas
-    const currentStepIndex = navigationState.currentStepIndex;
-    const nextStepIndex = Math.min(
-      currentStepIndex + 1,
-      instructions.length - 1
-    );
-
-    if (nextStepIndex > currentStepIndex) {
-      const nextStep = instructions[nextStepIndex];
-      if (nextStep) {
-        const distanceToNextStep = calculateDistance(
-          location.latitude,
-          location.longitude,
-          nextStep.latitude || nextStep.lat,
-          nextStep.longitude || nextStep.lon
-        );
-
-        monitorApproachingTurn(location, nextStep, distanceToNextStep, {
-          disableVibration: navigationState.disableTactileFeedback,
-          disableVoice: !navigationState.voiceGuidanceEnabled,
-        });
+      if (nextPoint) {
+        updateUserMarkerDirection(position, nextPoint);
       }
+    } catch (error) {
+      console.error(
+        "[updateRealTimeNavigation] Erro ao atualizar direção do marcador:",
+        error
+      );
     }
 
-    // 7. Verificar chegada ao destino
-    checkDestinationArrival(location.latitude, location.longitude);
+    // Atualizar distância restante e progresso
+    const remainingDistance = calculateRouteRemainingDistance({
+      posição: `${position.latitude}, ${position.longitude}`,
+      passoAtual: currentStepIndex,
+      totalPassos: navigationState.instructions
+        ? navigationState.instructions.length
+        : 0,
+    });
 
-    // 8. Otimização: apontar marcador para a direção correta
-    updateUserMarkerDirection(
-      location,
-      determineNextPoint(location, instructions, currentStepIndex)
-    );
+    // Atualizar barra de progresso se tivermos informações válidas
+    if (navigationState.totalDistance && remainingDistance) {
+      const progress = Math.max(
+        0,
+        Math.min(
+          100,
+          ((navigationState.totalDistance - remainingDistance) /
+            navigationState.totalDistance) *
+            100
+        )
+      );
+      updateProgressBar(progress);
+    }
+  } catch (error) {
+    console.error("[updateRealTimeNavigation] Erro geral:", error);
   }
-
-  // 9. Registrar timestamp da atualização
-  navigationState.lastUpdateTime = Date.now();
 }
+
 /**
  * Verifica se os plugins necessários para rotação estão carregados
  * @returns {boolean} Se os plugins estão disponíveis
@@ -1999,18 +2145,41 @@ function recoverFromNavigationError(error, state = navigationState) {
   return true;
 }
 
-// Adicionar função auxiliar para formatação de distância
-function formatDistance(distance) {
-  return distance < 1000
-    ? `${Math.round(distance)} m`
-    : `${(distance / 1000).toFixed(1)} km`;
-}
+/**
+ * Formata uma duração em segundos para um texto legível
+ * @param {number} seconds - Duração em segundos
+ * @returns {string} - Texto formatado (exemplo: "5 min" ou "30 s")
+ */
+export function formatDuration(seconds) {
+  if (seconds === undefined || seconds === null || isNaN(seconds)) {
+    return "0 min";
+  }
 
-// Adicionar função auxiliar para formatação de tempo
-function formatDuration(seconds) {
-  return seconds < 60
-    ? `${Math.round(seconds)} s`
-    : `${Math.round(seconds / 60)} min`;
+  // Garantir que os segundos são um número positivo
+  seconds = Math.abs(Math.round(Number(seconds)));
+
+  // Se for menor que 60 segundos
+  if (seconds < 60) {
+    return `${seconds} s`;
+  }
+
+  // Converter para minutos
+  const minutes = Math.round(seconds / 60);
+
+  // Se for menor que 60 minutos
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+
+  // Converter para horas e minutos
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (remainingMinutes === 0) {
+    return `${hours} h`;
+  } else {
+    return `${hours} h ${remainingMinutes} min`;
+  }
 }
 
 /**
@@ -2433,16 +2602,9 @@ export async function recalculateRoute(
 }
 
 /**
- * Calcula a distância entre dois pontos geográficos usando a fórmula de Haversine.
- * @param {number} lat1 - Latitude do primeiro ponto.
- * @param {number} lon1 - Longitude do primeiro ponto.
- * @param {number} lat2 - Latitude do segundo ponto.
- * @param {number} lon2 - Longitude do segundo ponto.
- * @returns {number} Distância em metros.
+ * Calcula a distância entre dois pontos em metros
  */
-export function calculateDistance(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2) return Infinity;
-
+function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371e3; // Raio da Terra em metros
   const φ1 = (lat1 * Math.PI) / 180;
   const φ2 = (lat2 * Math.PI) / 180;
@@ -2453,9 +2615,44 @@ export function calculateDistance(lat1, lon1, lat2, lon2) {
     Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
     Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c; // Em metros
 
-  return distance;
+  return R * c; // Distância em metros
+}
+
+/**
+ * Mostra a rota no mapa 3D
+ */
+export function showRoute3D(options) {
+  const { startLat, startLon, endLat, endLon } = options;
+
+  // Verificar se a distância excede o limite permitido
+  const distance = calculateDistance(startLat, startLon, endLat, endLon);
+  if (distance > 100000) {
+    // Limite de 100 km
+    console.warn("[showRoute3D] Distância excede o limite permitido pela API");
+    appendMessage(
+      "assistant",
+      "A rota solicitada excede o limite de distância permitido. Por favor, escolha um destino mais próximo.",
+      { speakMessage: true }
+    );
+    return;
+  }
+
+  // Chamar a API de rotas
+  getDirectionsRoute(startLat, startLon, endLat, endLon)
+    .then((data) => {
+      if (!data || !data.routes || !data.routes.length) {
+        console.warn("[showRoute3D] Nenhuma rota retornada pela API");
+        return;
+      }
+
+      // Adicionar rota ao mapa
+      const route = data.routes[0];
+      addRouteToMap(route.geometry.coordinates);
+    })
+    .catch((error) => {
+      console.error("[showRoute3D] Erro ao obter rota:", error);
+    });
 }
 
 /**
@@ -3211,7 +3408,7 @@ function ensureNavigationComponents() {
  * @param {number} [speed=1.4] - Velocidade média em m/s (padrão: 5 km/h = 1.4 m/s para caminhada)
  * @returns {number} - Tempo estimado em segundos
  */
-function estimateRemainingTime(distance, speed = 1.4) {
+export function estimateRemainingTime(distance, speed = 1.4) {
   if (!distance || isNaN(distance) || distance <= 0) {
     return 0;
   }
@@ -3357,5 +3554,115 @@ function toggleMinimizedState(banner, minimize) {
         "Minimizar instruções de navegação"
       );
     }
+  }
+}
+
+/**
+ * Calcula o rumo inicial da rota para orientação do mapa 3D
+ * @param {Object} routeData - Dados GeoJSON da rota
+ * @returns {number} - Rumo inicial em graus (0-360)
+ */
+function calculateInitialHeading(routeData) {
+  try {
+    if (!routeData || !routeData.features || !routeData.features.length) {
+      return 0;
+    }
+
+    const coordinates = routeData.features[0].geometry.coordinates;
+
+    if (!coordinates || coordinates.length < 2) {
+      return 0;
+    }
+
+    // Pegar os dois primeiros pontos da rota
+    const [startLon, startLat] = coordinates[0];
+    const [endLon, endLat] = coordinates[1];
+
+    // Verificar se temos coordenadas válidas
+    if (
+      typeof startLat !== "number" ||
+      typeof startLon !== "number" ||
+      typeof endLat !== "number" ||
+      typeof endLon !== "number"
+    ) {
+      return 0;
+    }
+
+    // Converter para radianos
+    const startLatRad = (startLat * Math.PI) / 180;
+    const startLonRad = (startLon * Math.PI) / 180;
+    const endLatRad = (endLat * Math.PI) / 180;
+    const endLonRad = (endLon * Math.PI) / 180;
+
+    // Calcular o ângulo usando fórmula de bearing
+    const y = Math.sin(endLonRad - startLonRad) * Math.cos(endLatRad);
+    const x =
+      Math.cos(startLatRad) * Math.sin(endLatRad) -
+      Math.sin(startLatRad) *
+        Math.cos(endLatRad) *
+        Math.cos(endLonRad - startLonRad);
+
+    // Converter para graus e normalizar para 0-360
+    let bearing = (Math.atan2(y, x) * 180) / Math.PI;
+    bearing = (bearing + 360) % 360;
+
+    console.log(
+      `[calculateInitialHeading] Rumo inicial calculado: ${bearing.toFixed(1)}°`
+    );
+    return bearing;
+  } catch (error) {
+    console.error(
+      "[calculateInitialHeading] Erro ao calcular rumo inicial:",
+      error
+    );
+    return 0;
+  }
+}
+/**
+ * Alterna entre navegação 2D e 3D
+ * @returns {boolean} - Estado atual do modo 3D (true se ativado)
+ */
+export function toggle3DNavigationMode() {
+  if (!navigationState.isActive) {
+    console.warn("[toggle3DNavigationMode] Não há navegação ativa");
+    return false;
+  }
+
+  try {
+    if (isNavigation3DActive()) {
+      disableNavigation3D();
+      navigationState.is3DModeEnabled = false;
+      console.log("[toggle3DNavigationMode] Modo 3D desativado");
+      return false;
+    } else {
+      // Obter dados para orientação inicial
+      let navigationHeading = 0;
+
+      // Tentar obter direção da posição atual
+      if (navigationState.lastKnownUserPosition?.heading) {
+        navigationHeading = navigationState.lastKnownUserPosition.heading;
+      }
+      // Ou calcular da rota se disponível
+      else if (navigationState.routeData) {
+        navigationHeading = calculateInitialHeading(navigationState.routeData);
+      }
+
+      const success = enableNavigation3D({
+        navigationHeading: navigationHeading,
+        pitch: 60,
+      });
+
+      navigationState.is3DModeEnabled = success;
+      console.log(
+        `[toggle3DNavigationMode] Modo 3D ${
+          success ? "ativado" : "falha ao ativar"
+        }`
+      );
+      return success;
+    }
+  } catch (error) {
+    console.error("[toggle3DNavigationMode] Erro ao alternar modo 3D:", error);
+    navigationState.is3DModeEnabled = false;
+    return false;
   }
 }

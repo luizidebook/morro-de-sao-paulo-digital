@@ -33,7 +33,7 @@ function fixIOSKeyboard() {
       }
 
       if (assistantMessages) {
-        assistantMessages.style.bottom = "70px"; // Garantir que não fique sob o teclado
+        assistantMessages.style.bottom = "270px"; // Garantir que não fique sob o teclado
         assistantMessages.style.maxHeight = "40vh"; // Reduzir altura para manter visibilidade
       }
     } else {

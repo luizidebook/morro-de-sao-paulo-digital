@@ -10,7 +10,14 @@
 
 /* Components buttons */
 @import "components/buttons/buttons.css";
+/* Add this to the end of main.css */
 
+/* Fix for 3D map */
+@import "components/accessibility.css";
+@import "components/map/map-3d-fixes.css";
+@import "components/map/map3d.css";
+@import "components/map/map3d-loading.css";
+@import "components/map/mapbox-osm-3d.css";
 @import "components/popups.css";
 
 @import "navigation/user-marker.css";
@@ -33,3 +40,8 @@
 
 /* Media queries globais */
 @import "base/responsive.css";
+
+/* Replace any instances of */
+@media (forced-colors: active) {
+  /* same styles... */
+}

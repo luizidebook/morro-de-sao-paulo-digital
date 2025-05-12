@@ -115,3 +115,22 @@
 .accuracy-low .accuracy-circle {
   border-color: #ff2200;
 }
+
+/* Adicionar ao arquivo user-marker.css */
+
+/* Estilos para o marcador em modo 3D */
+.immersive-mode .user-marker {
+  transform-origin: center;
+  /* Ajuste específico para modo 3D */
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Animação para transição entre modos */
+.user-marker.transitioning {
+  transition: all 0.5s ease-in-out;
+}
+
+/* Estilos específicos para marcador 3D */
+.user-marker.three-d {
+  /* Estilos específicos para o marcador em 3D */
+}

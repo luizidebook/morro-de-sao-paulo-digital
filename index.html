@@ -12,9 +12,10 @@
     />
     <title>Morro de São Paulo Digital</title>
     <link rel="stylesheet" href="./css/main.css" />
-    <link rel="stylesheet" href="./css/components/map/map-rotation.css" />
-
-
+    <link rel="stylesheet" href="./css/components/accessibility.css" />
+    <link rel="stylesheet" href="./css/vendor-fixes.css" />
+    <link rel="stylesheet" href="css/components/map/mapbox-osm-3d.css">
+  
 <!-- Carregar Leaflet primeiro (versão única) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <!-- Carregar apenas uma versão do Leaflet -->
@@ -52,7 +53,51 @@ href="https://unpkg.com/swiper/swiper-bundle.min.css"
     <script src="https://cdn.jsdelivr.net/npm/swiper/swiper-bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/weather-icons/2.0.10/css/weather-icons.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  </head>
+
+    <style>
+      #loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #0043b3;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        transition: opacity 0.5s ease-in-out;
+      }
+      
+      #loading-overlay.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      .loading-text {
+        color: white;
+        font-size: 18px;
+        font-family: 'Poppins', sans-serif;
+        text-align: center;
+        max-width: 80%;
+      }
+    </style>
+</head>
 
   <body>
     <!-- App Shell -->
@@ -129,28 +174,29 @@ href="https://unpkg.com/swiper/swiper-bundle.min.css"
   </button>
 </div>
        
+<div id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <p class="loading-text">Carregando Morro Digital...</p>
+</div>
 
-
-
-    <!-- Loading Overlay -->
-    <div id="loading-overlay">
-      <div class="loading-content">
-        <div class="spinner"></div>
-        <p>Carregando Morro Digital...</p>
-      </div>
-    </div>
+<script>
+  // Expose function to hide overlay
+  window.hideLoadingOverlay = function() {
+    const overlay = document.getElementById("loading-overlay");
+    if (overlay) {
+      overlay.classList.add("fade-out");
+      
+      // After animation completes, hide completely
+      setTimeout(() => {
+        overlay.style.display = 'none';
+      }, 600); // slightly longer than the CSS transition
+    }
+  };
+</script>
 
     <!-- Scripts principais -->
     <script type="module" src="./main.js"></script>
-    <script>
-      // Remove loading overlay when content loads
-      window.addEventListener("load", function () {
-        setTimeout(function () {
-          document.getElementById("loading-overlay").classList.add("fade-out");
-        }, 800);
-      });
 
-    </script>
   </body>
 </html>
 

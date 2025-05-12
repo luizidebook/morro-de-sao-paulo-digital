@@ -1,0 +1,117 @@
+/* Estilos do marcador do usuário */
+.user-marker {
+  transition: transform 0.3s ease-out;
+  fill: #ff0000 !important; /* Forçar cor vermelha */
+}
+.user-marker path {
+  fill: #ff0000 !important; /* Forçar cor vermelha */
+}
+/* Efeitos de pulso */
+.pulse {
+  animation-duration: 2s;
+  animation-iteration-count: infinite;
+}
+
+.pulse-normal {
+  animation-name: pulse-blue;
+}
+
+.pulse-alert {
+  animation-name: pulse-orange;
+}
+
+.pulse-arrival {
+  animation-name: pulse-green;
+}
+
+@keyframes pulse-blue {
+  0% {
+    filter: drop-shadow(0 0 0px rgba(66, 133, 244, 0.8));
+  }
+  50% {
+    filter: drop-shadow(0 0 6px rgba(66, 133, 244, 0.8));
+  }
+  100% {
+    filter: drop-shadow(0 0 0px rgba(66, 133, 244, 0.8));
+  }
+}
+
+@keyframes pulse-orange {
+  0% {
+    filter: drop-shadow(0 0 0px rgba(202, 0, 0, 0.8));
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(202, 0, 0, 0.8));
+  }
+  100% {
+    filter: drop-shadow(0 0 0px rgba(202, 0, 0, 0.8));
+  }
+}
+
+@keyframes pulse-green {
+  0% {
+    filter: drop-shadow(0 0 0px rgba(34, 170, 68, 0.8));
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(34, 170, 68, 0.8));
+  }
+  100% {
+    filter: drop-shadow(0 0 0px rgba(34, 170, 68, 0.8));
+  }
+}
+
+/* Suavizar movimento */
+.leaflet-marker-icon {
+  transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Efeito de rotação suave */
+.user-marker.rotating {
+  transition: transform 0.5s ease-out;
+}
+
+/* Estilos específicos por tipo de marcador */
+.default-marker {
+}
+.navigation-marker {
+}
+.arrival-marker {
+}
+.searching-marker {
+}
+.precise-marker {
+}
+
+/* Ajuste para dispositivos de tela pequena */
+@media (max-width: 375px) {
+  .user-marker {
+    transform: scale(0.85);
+  }
+}
+/* Adicionar ao arquivo user-marker.css ou navigationUserLocation.css */
+.signal-lost .instruction-primary {
+  opacity: 0.7;
+}
+
+.signal-lost:after {
+  content: "Sinal GPS fraco";
+  display: block;
+  font-size: 0.8rem;
+  background: #f84a00;
+  color: white;
+  padding: 2px 8px;
+  text-align: center;
+}
+
+/* Estilos para exibir estados de precisão */
+.accuracy-high .accuracy-circle {
+  border-color: #22aa44;
+}
+
+.accuracy-medium .accuracy-circle {
+  border-color: #4285f4;
+}
+
+.accuracy-low .accuracy-circle {
+  border-color: #ff2200;
+}

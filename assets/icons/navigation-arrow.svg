@@ -1,0 +1,13 @@
+<!-- filepath: c:\Users\luizi\Documents\morro-digital-oficial-main\assets\images\navigation-arrow.svg -->
+<svg viewBox="0 0 24 24" width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Base da seta vermelha com destaque de navegação -->
+  <path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z" 
+        fill="#ff0000" 
+        stroke="#ffffff" 
+        stroke-width="1.5" 
+        stroke-linejoin="round"/>
+  
+  <!-- Efeito de destaque mais proeminente para navegação ativa -->
+  <circle cx="12" cy="12" r="4" fill="rgba(255, 255, 255, 0.2)"/>
+  <circle cx="12" cy="12" r="2" fill="#ffffff" fill-opacity="0.9"/>
+</svg>

@@ -4,7 +4,6 @@
 import { initializeMap } from "./js/map/map-controls.js";
 import { initializeAssistant } from "./js/assistant/assistant.js";
 import { translatePageContent } from "./js/i18n/translatePageContent.js";
-import { initPerformanceOptimizations } from "./js/analytics/performance.js";
 import {
   setupAssistantInteractions,
   createAssistantUI,
@@ -16,7 +15,6 @@ import { setupQuickActionButtonsEvents } from "./js/utils/quick-actions.js";
 import { assistantMood } from "./js/assistant/assistant-mood/assistantMood.js";
 import { setupNavigationUIObserver } from "./js/utils/ui-position.js";
 import initMessagesPositionManager from "./js/utils/messages-position-manager.js";
-import { integrateNavigationSystems } from "./js/navigation/navigationIntegration.js";
 
 export let userLocation = {};
 export let userPopup = null;

@@ -13,6 +13,8 @@
 
 @import "components/popups.css";
 
+@import "navigation/user-marker.css";
+
 @import "components/assistant/assistantModalUI.css";
 @import "components/assistant/assistant-mood.css";
 

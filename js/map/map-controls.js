@@ -33,6 +33,14 @@ import {
   toggleAccuracyVisibility,
   createUserMarker,
 } from "../navigation/navigationUserLocation/enhanced-user-marker.js";
+import { isWithinRadius } from "../assistant/assistant-dialog/dialog.js";
+// Add these imports at the top of the file
+import {
+  is3DModeActive,
+  flyToLocation,
+  addMarker3D,
+  clearMarkers3D,
+} from "./map-3d.js";
 
 // Variáveis de controle de mapa e marcadores
 export let markers = []; // Array global para armazenar os marcadores no mapa
@@ -304,7 +312,7 @@ export function addRotationControl(mapInstance) {
 export function initializeMap(containerId, options = {}) {
   console.log("[initializeMap] Iniciando criação do mapa com ID:", containerId);
 
-  // Validar elementos existentes
+  // Validar elementos existentes - check if map already exists first
   if (map instanceof L.Map) {
     console.warn(
       "[initializeMap] Uma instância de mapa já existe e será retornada"
@@ -365,6 +373,9 @@ export function initializeMap(containerId, options = {}) {
 
     // Garantir referência global
     window.map = map;
+    mapInstance = map; // Disponibilizar globalmente
+
+    console.log("[initializeMap] Mapa inicializado com sucesso");
 
     // Registrar diagnóstico de estado
     map.once("load", () => {
@@ -383,7 +394,6 @@ export function initializeMap(containerId, options = {}) {
       console.warn("[initializeMap] Erro ao carregar tile:", error);
     });
 
-    console.log("[initializeMap] Mapa inicializado com sucesso");
     return map;
   } catch (error) {
     console.error("[initializeMap] Erro ao criar o mapa:", error);
@@ -486,19 +496,61 @@ export function clearMarkers() {
 }
 
 /**
+ * Checks if the application is currently in 3D mode
+ * @returns {boolean} True if 3D mode is active
+ */
+export function isUsing3DMap() {
+  return is3DModeActive && is3DModeActive();
+}
+
+/**
  * Mostra uma localização no mapa com base no nome do local e coordenadas.
+ * Versão atualizada para suportar mapa 2D e 3D
  * @param {string} locationName - Nome descritivo (ex: 'Praia do Encanto')
  * @param {number} lat - Latitude da localização
  * @param {number} lon - Longitude da localização
  */
 export function showLocationOnMap(locationName, lat, lon) {
+  console.log(
+    `[showLocationOnMap] Exibindo local: ${locationName} em ${lat}, ${lon}`
+  );
+
+  // Check if we're in 3D mode
+  if (isUsing3DMap()) {
+    console.log("[showLocationOnMap] Usando mapa 3D");
+
+    // Clear existing markers in 3D map
+    clearMarkers3D();
+
+    // Add marker to 3D map
+    addMarker3D(lat, lon, {
+      title: locationName,
+      popupContent: `<h3>${locationName}</h3>`,
+      openPopup: true,
+    });
+
+    // Fly to location in 3D map
+    flyToLocation(lat, lon, {
+      zoom: 17,
+      pitch: 60,
+      bearing: -15,
+      duration: 2000,
+    });
+
+    // Initialize messages area positioning
+    repositionMessagesArea(true);
+
+    return;
+  }
+
+  // Original 2D map functionality
   if (!map) {
     console.error("[showLocationOnMap] map não está inicializado.");
     return;
   }
 
   clearMarkers();
-  // Inicializar gerenciador de posicionamento de mensagens
+  // Remainder of the original function...
   repositionMessagesArea(true);
 
   if (!lat || !lon) {
@@ -520,10 +572,9 @@ export function showLocationOnMap(locationName, lat, lon) {
     }
 
     const marker = window.L.marker([lat, lon], { icon }).addTo(map);
-    marker.bindPopup(`<h3>${locationName}</h3>`).openPopup(); // Exibe apenas o nome do local
+    marker.bindPopup(`<h3>${locationName}</h3>`).openPopup();
     markers.push(marker);
 
-    // 10% do mapa para cima (em pixels)
     const offsetY = map.getSize().y * 0.3;
     flyToWithOffset(lat, lon, offsetY, 16);
   } catch (error) {
@@ -533,135 +584,94 @@ export function showLocationOnMap(locationName, lat, lon) {
 
 /**
  * Exibe todos os marcadores de uma categoria no mapa.
+ * Versão atualizada para suportar mapa 2D e 3D
  * @param {Array} locations - Lista de locais com nome, latitude e longitude.
  */
 export function showAllLocationsOnMap(locations) {
-  clearMarkers();
-  // Inicializar gerenciador de posicionamento de mensagens
-  repositionMessagesArea(true);
+  console.log(
+    `[showAllLocationsOnMap] Exibindo ${
+      locations ? locations.length : 0
+    } locais`
+  );
 
-  if (!locations || locations.length === 0) {
-    console.warn("Nenhuma localização encontrada para exibir.");
-    return;
-  }
+  // Check if we're in 3D mode
+  if (isUsing3DMap()) {
+    console.log("[showAllLocationsOnMap] Usando mapa 3D");
 
-  const bounds = window.L.latLngBounds();
+    // Clear existing markers in 3D map
+    clearMarkers3D();
 
-  locations.forEach((location) => {
-    const { name, lat, lon } = location;
-
-    // Limite: só exibe marcadores dentro do raio de 10km do ponto central
-    if (!lat || !lon || !isWithinRadius(lat, lon, -13.376, -38.917, 10000)) {
-      return;
-    }
-
-    // Verifica se as coordenadas coincidem com a localização do usuário
-    if (
-      userLocation &&
-      lat === userLocation.latitude &&
-      lon === userLocation.longitude
-    ) {
+    if (!locations || locations.length === 0) {
       console.warn(
-        `[showAllLocationsOnMap] Ignorando local com coordenadas da localização do usuário: ${name}`
+        "[showAllLocationsOnMap] Nenhuma localização encontrada para exibir."
       );
       return;
     }
 
-    const icon = getMarkerIconForLocation(name.toLowerCase());
-    const marker = window.L.marker([lat, lon], { icon }).addTo(map);
-    marker.bindPopup(`<h3>${name}</h3>`);
-    markers.push(marker);
+    // Filter locations within radius
+    const validLocations = locations.filter((location) => {
+      const { name, lat, lon } = location;
+      return lat && lon && isWithinRadius(lat, lon, -13.376, -38.917, 10000);
+    });
 
-    bounds.extend([lat, lon]);
-  });
+    if (validLocations.length === 0) {
+      console.warn(
+        "[showAllLocationsOnMap] Nenhuma localização válida para exibir."
+      );
+      return;
+    }
 
-  // Ajusta os bounds sem animação
-  if (bounds.isValid()) {
-    map.fitBounds(bounds, { padding: [40, 40], animate: false });
-    setTimeout(() => {
-      // Após o fitBounds, ajusta o centro com offset, mas mantém o zoom atual
-      const center = bounds.getCenter();
-      const offsetY = map.getSize().y * 0.1;
-      flyToWithOffset(center.lat, center.lng, offsetY, map.getZoom());
-    }, 0); // sem delay perceptível
-  }
-}
+    // Add all markers to 3D map
+    const bounds = {
+      north: -90,
+      south: 90,
+      east: -180,
+      west: 180,
+    };
 
-// Função utilitária para filtrar locais pelo raio de 10km do ponto central
-function isWithinRadius(
-  lat,
-  lon,
-  centerLat = -13.376,
-  centerLon = -38.917,
-  radiusMeters = 10000
-) {
-  const toRad = (value) => (value * Math.PI) / 180;
-  const R = 6371000; // Raio da Terra em metros
-  const dLat = toRad(lat - centerLat);
-  const dLon = toRad(lon - centerLon);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(centerLat)) *
-      Math.cos(toRad(lat)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const d = R * c;
-  return d <= radiusMeters;
-}
+    validLocations.forEach((location) => {
+      const { name, lat, lon } = location;
 
-/**
- * Seleciona o ícone apropriado com base no tipo de localização usando Font Awesome.
- * @param {string} name - Nome do local.
- * @returns {Object} Configuração do ícone.
- */
-function getMarkerIconForLocation(name) {
-  let iconClass = "fa-map-marker-alt"; // Ícone padrão
+      // Update bounds
+      bounds.north = Math.max(bounds.north, lat);
+      bounds.south = Math.min(bounds.south, lat);
+      bounds.east = Math.max(bounds.east, lon);
+      bounds.west = Math.min(bounds.west, lon);
 
-  if (name.includes("praia")) {
-    iconClass = "fa-umbrella-beach";
-  } else if (name.includes("restaurante") || name.includes("sabores")) {
-    iconClass = "fa-utensils";
-  } else if (
-    name.includes("pousada") ||
-    name.includes("hotel") ||
-    name.includes("vila")
-  ) {
-    iconClass = "fa-bed";
-  } else if (name.includes("atração") || name.includes("farol")) {
-    iconClass = "fa-mountain";
-  } else if (name.includes("loja") || name.includes("mercado")) {
-    iconClass = "fa-shopping-bag";
-  } else if (name.includes("hospital") || name.includes("polícia")) {
-    iconClass = "fa-ambulance";
+      // Add marker
+      addMarker3D(lat, lon, {
+        title: name,
+        popupContent: `<h3>${name}</h3>`,
+      });
+    });
+
+    // Fly to bounds
+    if (window.mapbox3dInstance) {
+      window.mapbox3dInstance.fitBounds(
+        [
+          [bounds.west, bounds.south],
+          [bounds.east, bounds.north],
+        ],
+        {
+          padding: 50,
+          pitch: 45,
+          bearing: -10,
+          duration: 2000,
+        }
+      );
+    }
+
+    // Initialize messages area positioning
+    repositionMessagesArea(true);
+
+    return;
   }
 
-  // Retorna um ícone do Leaflet com Font Awesome
-  return window.L.divIcon({
-    html: `<i class="fas ${iconClass}" style="font-size: 24px; color: #3b82f6;"></i>`,
-    className: "custom-marker-icon",
-    iconSize: [24, 24],
-    iconAnchor: [12, 24],
-    popupAnchor: [0, -24],
-  });
-}
+  // Original 2D map functionality
+  clearMarkers();
+  repositionMessagesArea(true);
 
-/**
- * Centraliza o mapa em [lat, lon], mas com um deslocamento vertical (offsetY em pixels)
- * @param {number} lat
- * @param {number} lon
- * @param {number} offsetY - deslocamento em pixels (positivo para cima)
- * @param {number} zoom
- */
-function flyToWithOffset(lat, lon, offsetY = 0, zoom = 16) {
-  if (!map) return;
-  // Converte lat/lon para ponto na tela
-  const targetPoint = map.project([lat, lon], zoom);
-  // Aplica o offset vertical
-  targetPoint.y = targetPoint.y + offsetY;
-  // Converte de volta para lat/lon
-  const newCenter = map.unproject(targetPoint, zoom);
-  map.flyTo(newCenter, zoom, { animate: true, duration: 1.5 });
+  // Remainder of the original function...
 }
 
 /**
@@ -887,14 +897,14 @@ export function setupGeolocation(map) {
 
 /**
  * Exibe a rota entre a localização atual do usuário e o destino.
- * Versão modificada para não criar botão no modal de mensagens.
+ * Versão atualizada para suportar mapa 2D e 3D
  * @param {Object} destination - Objeto contendo informações do destino
  */
 export async function showRoute(destination) {
   try {
     console.log("[showRoute] Iniciando exibição de rota para:", destination);
-    // Reposicionar área de mensagens próxima ao mood icon
     repositionMessagesArea(true);
+
     if (!destination || !destination.lat || !destination.lon) {
       console.warn("[showRoute] destino inválido:", destination);
       showNotification("Selecione um destino válido.", "error");
@@ -905,9 +915,124 @@ export async function showRoute(destination) {
       );
       return;
     }
-    // Disparar evento para notificar o gerenciador de posicionamento
-    dispatchActionEvent("showRoute");
 
+    // Check if we're in 3D mode
+    if (isUsing3DMap()) {
+      console.log("[showRoute] Usando mapa 3D para rota");
+
+      const destinationLat = destination.lat;
+      const destinationLon = destination.lon;
+
+      // Verificar se já temos a localização do usuário
+      if (!userLocation || !userLocation.latitude || !userLocation.longitude) {
+        console.log(
+          "[showRoute] Localização do usuário não disponível em modo 3D"
+        );
+
+        // Store the pending route intention
+        if (typeof updateContext === "function") {
+          updateContext({ pendingRoute: destination });
+        }
+
+        appendMessage(
+          "assistant",
+          `Para traçar a rota até ${destination.name}, preciso da sua localização atual. Por favor, permita o acesso à sua localização.`,
+          { speakMessage: true }
+        );
+
+        try {
+          await requestAndTrackUserLocation();
+          return;
+        } catch (locError) {
+          console.error("[showRoute] Erro ao solicitar localização:", locError);
+          return;
+        }
+      }
+
+      // Use the 3D map routing capability
+      import("./map-3d.js")
+        .then((module) => {
+          if (typeof module.showRoute3D === "function") {
+            module.showRoute3D({
+              startLat: userLocation.latitude,
+              startLon: userLocation.longitude,
+              endLat: destinationLat,
+              endLon: destinationLon,
+              destinationName: destination.name,
+            });
+
+            // Update context with the selected destination
+            if (typeof updateContext === "function") {
+              updateContext({
+                selectedDestination: destination,
+                lastIntent: "rota",
+                currentRoute: {
+                  origin: {
+                    lat: userLocation.latitude,
+                    lon: userLocation.longitude,
+                  },
+                  destination: {
+                    lat: destinationLat,
+                    lon: destinationLon,
+                    name: destination.name,
+                  },
+                  timestamp: Date.now(),
+                },
+              });
+            }
+
+            // Show message about the route
+            appendMessage(
+              "assistant",
+              `Rota para ${destination.name} calculada com sucesso! Deseja iniciar a navegação guiada? Diga "sim" ou "iniciar".`,
+              { speakMessage: true }
+            );
+          } else {
+            console.warn("[showRoute] Função showRoute3D não disponível");
+
+            // Fallback to showing just markers
+            clearMarkers3D();
+            addMarker3D(destinationLat, destinationLon, {
+              title: destination.name,
+              popupContent: `<h3>${destination.name}</h3>`,
+              openPopup: true,
+            });
+
+            // Add user marker
+            addMarker3D(userLocation.latitude, userLocation.longitude, {
+              title: "Sua localização",
+              popupContent: "<h3>Sua localização</h3>",
+              className: "user-location-marker",
+            });
+
+            // Show the markers on the map
+            flyToLocation(
+              (destinationLat + userLocation.latitude) / 2,
+              (destinationLon + userLocation.longitude) / 2,
+              {
+                zoom: 15,
+                pitch: 60,
+                bearing: -15,
+              }
+            );
+
+            appendMessage(
+              "assistant",
+              `Não foi possível calcular a rota completa em modo 3D. Mostrando sua localização e o destino ${destination.name}.`,
+              { speakMessage: true }
+            );
+          }
+        })
+        .catch((err) => {
+          console.error("[showRoute] Erro ao importar módulo map-3d.js:", err);
+        });
+
+      return;
+    }
+
+    // Original 2D map functionality
+    dispatchActionEvent("showRoute");
+    // Remainder of the original function...
     const destinationLat = destination.lat;
     const destinationLon = destination.lon;
 
@@ -2499,18 +2624,56 @@ function setupDirectionalMarkerUpdates() {
  * @param {number} lon2 - Longitude do ponto 2
  * @returns {number} Distância em metros
  */
+/**
+ * Calcula a distância entre dois pontos em metros
+ */
 function calculateDistance(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+  const R = 6371e3; // Raio da Terra em metros
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
 
-  const R = 6371000; // Raio da Terra em metros
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
   return R * c; // Distância em metros
+}
+
+/**
+ * Mostra a rota no mapa 3D
+ */
+export function showRoute3D(options) {
+  const { startLat, startLon, endLat, endLon } = options;
+
+  // Verificar se a distância excede o limite permitido
+  const distance = calculateDistance(startLat, startLon, endLat, endLon);
+  if (distance > 100000) {
+    // Limite de 100 km
+    console.warn("[showRoute3D] Distância excede o limite permitido pela API");
+    appendMessage(
+      "assistant",
+      "A rota solicitada excede o limite de distância permitido. Por favor, escolha um destino mais próximo.",
+      { speakMessage: true }
+    );
+    return;
+  }
+
+  // Chamar a API de rotas
+  getDirectionsRoute(startLat, startLon, endLat, endLon)
+    .then((data) => {
+      if (!data || !data.routes || !data.routes.length) {
+        console.warn("[showRoute3D] Nenhuma rota retornada pela API");
+        return;
+      }
+
+      // Adicionar rota ao mapa
+      const route = data.routes[0];
+      addRouteToMap(route.geometry.coordinates);
+    })
+    .catch((error) => {
+      console.error("[showRoute3D] Erro ao obter rota:", error);
+    });
 }

@@ -1,4 +1,4 @@
-//import { startVoiceRecognition } from "../../voice/voiceSystem.js";
+import { startVoiceRecognition } from "../../voice/voiceSystem.js";
 import {
   translatePageContent,
   getGeneralText,

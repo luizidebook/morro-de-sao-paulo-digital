@@ -299,7 +299,7 @@ header h1 {
 @media (max-width: 374px) {
   /* Abaixo do --bp-mobile */
   .quick-actions {
-    left: var(--spacing-xs);
+    left: 5px; /* 5px -> ~0.3125rem */
     bottom: calc(env(safe-area-inset-bottom, 0px) + 4.375rem); /* 70px / 16px */
     max-width: 2.5rem; /* 40px / 16px */
   }
@@ -321,7 +321,7 @@ header h1 {
   }
 
   .quick-actions {
-    left: var(--spacing-sm);
+    left: 5px;
     bottom: 5.3125rem; /* 85px / 16px */
     max-width: 3.4375rem; /* 55px / 16px */
   }
@@ -348,7 +348,7 @@ header h1 {
 
   .quick-actions {
     bottom: calc(env(safe-area-inset-bottom, 0px) + 3.75rem); /* 60px / 16px */
-    left: var(--spacing-sm);
+    left: 5px;
   }
 
   #submenu {

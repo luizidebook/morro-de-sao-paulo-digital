@@ -148,183 +148,6 @@ export function estimateArrivalTime(distance, speed) {
 }
 
 /**
- * Calcula uma rota entre dois pontos usando a API de roteamento
- * @param {Array} start - Coordenadas de início [longitude, latitude]
- * @param {Array} end - Coordenadas de destino [longitude, latitude]
- * @param {Object} options - Opções adicionais
- * @returns {Promise<Object>} - Objeto GeoJSON com a rota
- */
-export async function calculateRoute(start, end, options = {}) {
-  console.log("[calculateRoute] Calculando rota:", { start, end, options });
-
-  try {
-    // Parâmetros padrão
-    const defaultOptions = {
-      profile: "foot-walking",
-      format: "geojson",
-      instructions: true,
-      language: "pt",
-    };
-
-    // Mesclar opções
-    const finalOptions = { ...defaultOptions, ...options };
-
-    // URL da API de roteamento (substitua pela API real em uso)
-    // Exemplo usando OpenRouteService
-    const apiKey = "5b3ce3597851110001cf62480e27ce5b5dcf4e75a9813468e027d0d3"; // Substitua pela sua chave da API
-    const baseUrl = "https://api.openrouteservice.org/v2/directions";
-
-    // Construir URL
-    const url = `${baseUrl}/${finalOptions.profile}/geojson`;
-
-    // Preparar corpo da requisição
-    const body = {
-      coordinates: [start, end],
-      language: finalOptions.language,
-      instructions: finalOptions.instructions,
-      elevation: false,
-      continue_straight: true,
-      preference: "shortest",
-    };
-
-    // Fazer requisição
-    console.log("[calculateRoute] Enviando requisição:", url);
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: apiKey,
-      },
-      body: JSON.stringify(body),
-    });
-
-    // Verificar se a requisição foi bem-sucedida
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        `Erro na API (${response.status}): ${
-          errorData.message || response.statusText
-        }`
-      );
-    }
-
-    // Processar resposta
-    const data = await response.json();
-    console.log("[calculateRoute] Rota calculada com sucesso");
-
-    return data;
-  } catch (error) {
-    console.error("[calculateRoute] Erro ao calcular rota:", error);
-
-    // Se for um erro de API, tentar usar API de fallback
-    if (error.message.includes("Erro na API")) {
-      console.log("[calculateRoute] Tentando API de fallback...");
-      return calculateRouteFallback(start, end, options);
-    }
-
-    throw error;
-  }
-}
-
-/**
- * Implementação de fallback para cálculo de rota
- * @param {Array} start - Coordenadas de início [longitude, latitude]
- * @param {Array} end - Coordenadas de destino [longitude, latitude]
- * @param {Object} options - Opções adicionais
- * @returns {Promise<Object>} - Objeto GeoJSON com a rota
- */
-async function calculateRouteFallback(start, end, options = {}) {
-  console.log("[calculateRouteFallback] Usando rota de fallback");
-
-  try {
-    // Criar uma rota simples (linha reta)
-    const route = {
-      type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          geometry: {
-            type: "LineString",
-            coordinates: [start, end],
-          },
-          properties: {
-            summary: {
-              distance: calculateDistanceFromCoords(
-                start[1],
-                start[0],
-                end[1],
-                end[0]
-              ),
-              duration: 600, // 10 minutos como estimativa
-            },
-            segments: [
-              {
-                steps: [
-                  {
-                    instruction: "Siga em direção ao destino",
-                    distance: calculateDistanceFromCoords(
-                      start[1],
-                      start[0],
-                      end[1],
-                      end[0]
-                    ),
-                    duration: 600,
-                    type: 0,
-                    way_points: [0, 1],
-                  },
-                  {
-                    instruction: `Chegou ao seu destino`,
-                    distance: 0,
-                    duration: 0,
-                    type: 10,
-                    way_points: [1, 1],
-                  },
-                ],
-              },
-            ],
-          },
-        },
-      ],
-    };
-
-    return route;
-  } catch (error) {
-    console.error("[calculateRouteFallback] Erro no fallback:", error);
-    throw new Error("Não foi possível calcular a rota");
-  }
-}
-
-/**
- * Calcula a distância entre dois pontos em coordenadas (latitude, longitude)
- * @param {number} lat1 - Latitude do ponto 1
- * @param {number} lon1 - Longitude do ponto 1
- * @param {number} lat2 - Latitude do ponto 2
- * @param {number} lon2 - Longitude do ponto 2
- * @returns {number} - Distância em metros
- */
-function calculateDistanceFromCoords(lat1, lon1, lat2, lon2) {
-  const R = 6371000; // Raio da Terra em metros
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
-
-  return distance;
-
-  function toRad(degrees) {
-    return (degrees * Math.PI) / 180;
-  }
-}
-
-/**
  * Calcula a progressão da rota com base na posição atual
  * @param {Object} currentPosition - Posição atual {lat, lon}
  * @param {Array} routeCoordinates - Coordenadas da rota [{lat, lon}, ...]
@@ -492,9 +315,43 @@ export function findClosestPointOnRoute(routePoints, refLat, refLon) {
   };
 }
 
+// No final do arquivo, atualizar o export default:
+
 export default {
   calculateDistance,
-
+  isValidCoordinate,
   bearingToCardinal,
   findClosestPointOnRoute,
+  isWithinRadius, // Adicionar a nova função
 };
+
+/**
+ * Verifica se um ponto está dentro de um raio específico de outro ponto
+ * @param {Object} point - Ponto para verificar {lat, lon} ou {latitude, longitude}
+ * @param {Object} center - Ponto central {lat, lon} ou {latitude, longitude}
+ * @param {number} radius - Raio em metros
+ * @returns {boolean} - true se estiver dentro do raio, false caso contrário
+ */
+export function isWithinRadius(point, center, radius) {
+  if (!point || !center || !radius) return false;
+
+  // Normalizar coordenadas
+  const pointLat = point.lat || point.latitude;
+  const pointLon = point.lon || point.lng || point.longitude;
+  const centerLat = center.lat || center.latitude;
+  const centerLon = center.lon || center.lng || center.longitude;
+
+  // Verificar se coordenadas são válidas
+  if (
+    !isValidCoordinate(pointLat, pointLon) ||
+    !isValidCoordinate(centerLat, centerLon)
+  ) {
+    return false;
+  }
+
+  // Calcular distância
+  const distance = calculateDistance(pointLat, pointLon, centerLat, centerLon);
+
+  // Verificar se está dentro do raio
+  return distance <= radius;
+}

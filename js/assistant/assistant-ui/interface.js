@@ -1070,6 +1070,49 @@ notificationStyle.textContent = `
 
 document.head.appendChild(notificationStyle);
 
+// Adicionar esta função de diagnóstico e chamá-la na inicialização
+
+// Função para diagnóstico de localStorage
+function diagnoseLocalStorageVoiceSettings() {
+  console.group("=== DIAGNÓSTICO DE CONFIGURAÇÕES DE VOZ ===");
+
+  try {
+    console.log("voice-enabled:", localStorage.getItem("voice-enabled"));
+    console.log("voiceConfig:", localStorage.getItem("voiceConfig"));
+    console.log("assistant-voice:", localStorage.getItem("assistant-voice"));
+    console.log("voice-speed:", localStorage.getItem("voice-speed"));
+    console.log("voiceAssistant:", localStorage.getItem("voiceAssistant"));
+
+    const toggleEl = document.getElementById("voice-enabled-toggle");
+    if (toggleEl) {
+      console.log("Estado do toggle no DOM:", toggleEl.checked);
+      console.log("Elemento toggle HTML:", toggleEl.outerHTML);
+    } else {
+      console.log("Elemento toggle não encontrado no DOM");
+    }
+
+    // Verificar os estilos CSS
+    if (toggleEl) {
+      const styles = window.getComputedStyle(toggleEl);
+      console.log("Toggle visibilidade:", styles.visibility);
+      console.log("Toggle display:", styles.display);
+
+      const slider = document.querySelector(".toggle-slider");
+      if (slider) {
+        const sliderStyles = window.getComputedStyle(slider);
+        console.log("Slider background:", sliderStyles.backgroundColor);
+      }
+    }
+  } catch (e) {
+    console.error("Erro durante diagnóstico:", e);
+  }
+
+  console.groupEnd();
+}
+
+// Chamar o diagnóstico na inicialização
+setTimeout(diagnoseLocalStorageVoiceSettings, 2000);
+
 // Adicionar esta função no arquivo interface.js
 
 // Detectar quando o teclado é mostrado/ocultado

@@ -56,7 +56,7 @@ export function createNavigationBanner() {
     <div class="instruction-secondary">
       <p id="${UI_CONFIG.IDS.INSTRUCTION_DETAILS}" class="instruction-details">Siga em frente por 100m</p>
       <div class="progress-container">
-        <div id="progress" class="progress-bar" style="width: 0%"></div>
+        <div id="route-progress" class="progress-indicator-fill" style="width: 0%"></div>
       </div>
       <div id="progress-text" style="text-align: center; font-size: 0.8em; margin: 4px 0;">0%</div>
       <div class="metrics-group">
@@ -349,7 +349,7 @@ export function updateInstructionBanner(instruction, lang = selectedLanguage) {
       UI_CONFIG.IDS.INSTRUCTION_DISTANCE
     );
     const timeEl = document.getElementById(UI_CONFIG.IDS.INSTRUCTION_TIME);
-    const progressEl = banner.querySelector(".progress-bar");
+    const progressEl = banner.querySelector(".progress-indicator-fill");
 
     // 6. Verificar se todos os elementos críticos existem
     if (!iconEl || !mainTextEl || !detailsEl || !distanceEl || !timeEl) {
@@ -862,7 +862,7 @@ export function ensureBannerIntegrity() {
       id: UI_CONFIG.IDS.INSTRUCTION_TIME,
       selector: `#${UI_CONFIG.IDS.INSTRUCTION_TIME}`,
     },
-    { id: "progress", selector: ".progress-bar" },
+    { id: "#progress", selector: ".progress-indicator-fill" },
   ];
 
   let needsRebuild = false;
@@ -1018,7 +1018,7 @@ function addBannerStyles() {
       margin: 12px 0;
     }
     
-    .progress-bar {
+    .progress-indicator-fill {
       height: 100%;
       background-color: #2563EB;
       border-radius: 2px;
@@ -1026,7 +1026,7 @@ function addBannerStyles() {
       transition: width 0.3s ease;
     }
     
-    .progress-bar.almost-complete {
+    .progress-indicator-fill.almost-complete {
       background-color: #10B981;
     }
     

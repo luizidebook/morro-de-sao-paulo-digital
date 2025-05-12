@@ -24,7 +24,7 @@ import {
 } from "../assistant-context/context-manager.js";
 import { startCarousel } from "../../utils/carousel.js";
 import { startNavigation } from "../../navigation/navigationController/navigationController.js";
-import { clearAssistantMessages } from "../assistant.js";
+import { clearAssistantMessages, appendMessage } from "../assistant.js";
 import {
   getGeneralText,
   currentLang,
@@ -311,8 +311,8 @@ function findLastDestinationFromHistory() {
 export async function processUserInput(input, context = {}) {
   const ctx = getContext();
   const normalized = input.trim().toLowerCase();
-  const rotaRegex =
-    /(como chegar|chegar|criar rota|rota|ir para|como vou para|route to|go to)/i;
+  const navigateRegex =
+    /(como chegar|chegar|criar rota|rota|ir para|como vou para|navegar para|route to|go to)/i;
 
   // Exemplo: Resposta contextual para favoritos
   if (
@@ -572,53 +572,146 @@ export async function processUserInput(input, context = {}) {
     };
   }
 
-  // 4. Rota para um local
-  if (rotaRegex.test(normalized)) {
+  // 4. Rota para um local (Melhorado)
+  if (navigateRegex.test(normalized)) {
     console.log("[processUserInput] Detecção de comando de rota:", normalized);
 
-    let destino = allPlaces.find((loc) =>
-      normalized.includes(loc.name.toLowerCase())
-    );
-    if (!destino) {
-      destino = findLastDestinationFromHistory();
+    // Obter último destino da conversa ou destino explícito
+    let destination =
+      getDestinationFromContext() || getDestinationFromInput(normalized);
+
+    if (!destination) {
+      // Tente buscar do histórico como fallback
+      destination = findLastDestinationFromHistory();
       console.log(
         "[processUserInput] Destino encontrado no histórico:",
-        destino
+        destination
       );
-    } else {
-      console.log("[processUserInput] Destino encontrado direto:", destino);
     }
 
-    if (destino) {
-      if (!context.userLocation) {
+    if (destination) {
+      console.log("[processUserInput] Destino encontrado:", destination);
+
+      // Verificar se temos localização do usuário
+      if (
+        !window.userLocation ||
+        !isValidCoordinate(
+          window.userLocation.latitude,
+          window.userLocation.longitude
+        )
+      ) {
         console.log(
           "[processUserInput] Usuário ainda não compartilhou localização."
         );
+
+        // Mostrar mensagem
+        appendMessage(
+          "assistant",
+          "Estou calculando a distância e o tempo até " +
+            destination.name +
+            ", aguarde um momento...",
+          { speakMessage: true }
+        );
+
+        // Solicitar localização e depois iniciar navegação
+        requestAndTrackUserLocation()
+          .then((location) => {
+            console.log(
+              "[processUserInput] Localização obtida, iniciando navegação para:",
+              destination
+            );
+
+            // Garantir os campos no formato correto
+            const normalizedDestination = normalizeDestination(destination);
+
+            // Iniciar navegação usando a função adequada
+            startNavigationSafely(normalizedDestination);
+          })
+          .catch((error) => {
+            console.error(
+              "[processUserInput] Erro ao obter localização:",
+              error
+            );
+            appendMessage(
+              "assistant",
+              "Não consegui obter sua localização. Verifique se o GPS está ativado.",
+              { speakMessage: true }
+            );
+          });
+      } else {
+        // Já temos localização, iniciar navegação diretamente
+        console.log(
+          "[processUserInput] Localização já disponível, iniciando navegação"
+        );
+
+        // Garantir os campos no formato correto
+        const normalizedDestination = normalizeDestination(destination);
+
+        // Iniciar navegação
+        startNavigationSafely(normalizedDestination);
+      }
+
+      updateContext({
+        lastDestination: destination,
+        selectedDestination: destination,
+        lastIntent: "rota",
+      });
+
+      return {
+        text: messages.navigation.creating(destination.name),
+        action: () => {
+          // Esta ação será executada além do código acima
+          showRoute(destination);
+        },
+      };
+    } else {
+      console.log(
+        "[processUserInput] Comando de navegação sem destino específico"
+      );
+
+      // Verificar se o usuário especificou uma categoria em vez de destino específico
+      const category = extractCategoryFromInput(normalized);
+
+      if (category) {
+        // Se identificou uma categoria, mostrar opções dessa categoria
+        appendMessage(
+          "assistant",
+          `Para qual ${getCategoryNamePortuguese(
+            category
+          )} você deseja ir? Por favor, escolha um destino específico.`,
+          { speakMessage: true }
+        );
+
+        // Mostrar opções de lugares da categoria
+        const placesOptions = getPlacesFromCategory(category);
+        if (placesOptions.length > 0) {
+          // Mostrar as primeiras 5 opções
+          const limitedOptions = placesOptions.slice(0, 5);
+          appendMessage(
+            "system",
+            `Opções: ${limitedOptions.map((p) => p.name).join(", ")}`,
+            { isOptions: true }
+          );
+
+          // Salvar categoria no contexto
+          updateContext({ lastCategory: category });
+        }
+
         return {
-          text: messages.navigation.requestLocation(destino.name),
-          action: () => {
-            updateContext({
-              pendingRoute: destino,
-              selectedDestination: destino,
-              lastIntent: "rota",
-            });
-            requestAndTrackUserLocation();
-          },
+          text: messages.navigation.destinationMissing(),
+          options: placesOptions.slice(0, 5).map((p) => p.name),
         };
       } else {
-        updateContext({ lastIntent: "rota" });
+        appendMessage(
+          "assistant",
+          "Para onde você deseja ir? Por favor, especifique um destino.",
+          { speakMessage: true }
+        );
+
         return {
-          text: messages.navigation.creating(destino.name),
-          action: () => {
-            showRoute(destino);
-          },
+          text: messages.navigation.destinationMissing(),
         };
       }
-    } else {
-      console.log("[processUserInput] Nenhum destino encontrado.");
-      return {
-        text: messages.navigation.destinationMissing(),
-      };
     }
   }
 
@@ -682,7 +775,9 @@ export async function processUserInput(input, context = {}) {
     return {
       text: messageText,
       action: () => {
-        startNavigation(destino);
+        // Garantir os campos no formato correto antes de iniciar navegação
+        const normalizedDestination = normalizeDestination(destino);
+        startNavigation(normalizedDestination);
       },
     };
   }
@@ -698,4 +793,370 @@ export async function processUserInput(input, context = {}) {
   }
 
   return result;
+}
+
+/**
+ * Verifica se as coordenadas são válidas
+ * @param {number} lat - Latitude
+ * @param {number} lon - Longitude
+ * @returns {boolean} - Indica se as coordenadas são válidas
+ */
+function isValidCoordinate(lat, lon) {
+  return (
+    typeof lat === "number" &&
+    !isNaN(lat) &&
+    typeof lon === "number" &&
+    !isNaN(lon) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lon >= -180 &&
+    lon <= 180
+  );
+}
+
+/**
+ * Normaliza o formato do destino para garantir consistência
+ * @param {Object} destination - Destino a ser normalizado
+ * @returns {Object} - Destino normalizado
+ */
+function normalizeDestination(destination) {
+  // Verificar se temos pelo menos as coordenadas básicas
+  if (!destination.lat && !destination.latitude) {
+    console.error(
+      "[normalizeDestination] Destino não possui coordenadas:",
+      destination
+    );
+    throw new Error("Destino inválido: sem coordenadas");
+  }
+
+  return {
+    latitude: destination.lat || destination.latitude,
+    longitude: destination.lon || destination.lng || destination.longitude,
+    name: destination.name || "Destino",
+    category: destination.category || "location",
+    icon: destination.icon || determineIconForCategory(destination.category),
+    // Adicionar detalhes extras se disponíveis
+    description: destination.description || null,
+    arrivalRadius: destination.arrivalRadius || 30, // metros
+    navigationType: destination.navigationType || "walking", // walking, cycling, driving
+  };
+}
+
+/**
+ * Inicia a navegação com tratamento de erros
+ * @param {Object} destination - Destino normalizado
+ * @returns {boolean} - Se a navegação foi iniciada
+ */
+function startNavigationSafely(destination) {
+  try {
+    console.log(
+      "[startNavigationSafely] Tentando iniciar navegação para:",
+      destination.name
+    );
+
+    // Tentativa com versão global
+    if (typeof window.startNavigation === "function") {
+      console.log(
+        "[startNavigationSafely] Usando função global startNavigation"
+      );
+      window.startNavigation(destination);
+      return true;
+    }
+    // Tentativa com importação
+    else if (typeof startNavigation === "function") {
+      console.log(
+        "[startNavigationSafely] Usando função importada startNavigation"
+      );
+      startNavigation(destination);
+      return true;
+    }
+    // Tentativa de importação dinâmica
+    else {
+      console.log("[startNavigationSafely] Tentando importação dinâmica");
+      import("../../navigation/navigationController/navigationController.js")
+        .then((module) => {
+          if (typeof module.startNavigation === "function") {
+            console.log(
+              "[startNavigationSafely] Função encontrada via importação dinâmica"
+            );
+            module.startNavigation(destination);
+          } else {
+            throw new Error("Função startNavigation não encontrada no módulo");
+          }
+        })
+        .catch((error) => {
+          console.error(
+            "[startNavigationSafely] Erro na importação dinâmica:",
+            error
+          );
+          appendMessage(
+            "assistant",
+            "Desculpe, não consegui iniciar a navegação. Sistema temporariamente indisponível.",
+            { speakMessage: true }
+          );
+        });
+
+      return true;
+    }
+  } catch (error) {
+    console.error("[startNavigationSafely] Erro ao iniciar navegação:", error);
+    appendMessage(
+      "assistant",
+      "Desculpe, ocorreu um erro ao iniciar a navegação. Por favor, tente novamente.",
+      { speakMessage: true }
+    );
+    return false;
+  }
+}
+
+/**
+ * Extrai um destino a partir do texto de entrada
+ * @param {string} input - Texto do usuário
+ * @returns {Object|null} - Objeto de destino ou null
+ */
+function getDestinationFromInput(input) {
+  const normalizedInput = input.toLowerCase();
+
+  // Remover o comando de navegação para isolar o nome do destino
+  const commands = [
+    "como chegar",
+    "navegar para",
+    "ir para",
+    "rota para",
+    "chegar em",
+    "chegar na",
+    "chegar no",
+  ];
+  let potentialDestName = normalizedInput;
+
+  for (const cmd of commands) {
+    if (normalizedInput.includes(cmd)) {
+      potentialDestName = normalizedInput.split(cmd)[1].trim();
+      break;
+    }
+  }
+
+  // Se ficou muito curto, usar o texto original
+  if (potentialDestName.length < 3) {
+    potentialDestName = normalizedInput;
+  }
+
+  console.log(
+    "[getDestinationFromInput] Buscando destino para:",
+    potentialDestName
+  );
+
+  // Buscar correspondência na lista de lugares
+  for (const place of allPlaces) {
+    if (
+      (place.name && place.name.toLowerCase().includes(potentialDestName)) ||
+      potentialDestName.includes(place.name.toLowerCase())
+    ) {
+      console.log("[getDestinationFromInput] Destino encontrado:", place.name);
+      return place;
+    }
+  }
+
+  // Tentar encontrar correspondência parcial
+  for (const place of allPlaces) {
+    const words = potentialDestName.split(" ");
+    for (const word of words) {
+      if (word.length > 3 && place.name.toLowerCase().includes(word)) {
+        console.log(
+          "[getDestinationFromInput] Destino parcial encontrado:",
+          place.name
+        );
+        return place;
+      }
+    }
+  }
+
+  // Não encontrou
+  console.log(
+    "[getDestinationFromInput] Nenhum destino correspondente encontrado"
+  );
+  return null;
+}
+
+/**
+ * Extrai categoria a partir do texto do usuário
+ * @param {string} input - Texto do usuário
+ * @returns {string|null} - Categoria encontrada ou null
+ */
+function extractCategoryFromInput(input) {
+  const normalizedInput = input.toLowerCase();
+
+  // Verificar categorias comuns
+  const categoryMatches = {
+    praia: "beaches",
+    praias: "beaches",
+    restaurante: "restaurants",
+    comer: "restaurants",
+    hotel: "hotels",
+    pousada: "hotels",
+    hospedagem: "hotels",
+    compras: "shops",
+    loja: "shops",
+    atrações: "attractions",
+    turismo: "attractions",
+    balada: "nightlife",
+    bar: "nightlife",
+    hospital: "emergencies",
+    policia: "emergencies",
+    passeio: "tours",
+    tour: "tours",
+  };
+
+  for (const [keyword, category] of Object.entries(categoryMatches)) {
+    if (normalizedInput.includes(keyword)) {
+      return category;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Obter nome da categoria em português
+ * @param {string} category - Nome da categoria em inglês
+ * @returns {string} - Nome em português
+ */
+function getCategoryNamePortuguese(category) {
+  const categoryNames = {
+    beaches: "praia",
+    restaurants: "restaurante",
+    hotels: "hotel ou pousada",
+    shops: "loja",
+    attractions: "atração turística",
+    nightlife: "opção de vida noturna",
+    emergencies: "serviço de emergência",
+    tours: "passeio",
+  };
+
+  return categoryNames[category] || "destino";
+}
+
+/**
+ * Obtém lista de lugares de uma categoria
+ * @param {string} category - Categoria desejada
+ * @returns {Array} - Lista de lugares
+ */
+function getPlacesFromCategory(category) {
+  if (locations && locations[category] && Array.isArray(locations[category])) {
+    return locations[category].filter(
+      (place) => place.name && place.lat && place.lon
+    );
+  }
+  return [];
+}
+
+// Função auxiliar para determinar o ícone com base na categoria
+function determineIconForCategory(category) {
+  if (!category) return "map-marker";
+
+  const iconMap = {
+    beaches: "umbrella-beach",
+    restaurants: "utensils",
+    hotels: "hotel",
+    attractions: "camera",
+    bars: "glass-cheers",
+    shops: "shopping-bag",
+    parks: "tree",
+    landmarks: "landmark",
+    museums: "museum",
+    nightlife: "cocktail",
+    emergencies: "ambulance",
+    tours: "route",
+  };
+
+  return iconMap[category?.toLowerCase()] || "map-marker";
+}
+
+// Função auxiliar para extrair destino do contexto
+function getDestinationFromContext() {
+  // Verificar se temos algum destino no contexto
+  const context = typeof getContext === "function" ? getContext() : {};
+
+  // Verificar destinos no contexto em ordem de prioridade
+  if (context && context.selectedDestination) {
+    return context.selectedDestination;
+  }
+
+  if (context && context.pendingRoute) {
+    return context.pendingRoute;
+  }
+
+  if (context && context.lastPlace) {
+    // Buscar o local pelo nome
+    const place = allPlaces.find((p) => p.name === context.lastPlace);
+    if (place) return place;
+  }
+
+  if (context && context.lastDestination) {
+    return context.lastDestination;
+  }
+
+  // Verificar outras fontes potenciais
+  if (context && context.conversation) {
+    // Examinar as últimas 5 mensagens em busca de menções a lugares
+    const recentMessages = context.conversation.slice(-5);
+
+    for (const message of recentMessages) {
+      if (
+        message.entities &&
+        message.entities.places &&
+        message.entities.places.length > 0
+      ) {
+        // Retornar o lugar mais recente mencionado
+        return message.entities.places[0];
+      }
+    }
+  }
+
+  // Verificar no histórico de pesquisa
+  if (typeof findLastDestinationFromHistory === "function") {
+    const historyDestination = findLastDestinationFromHistory();
+    if (historyDestination) return historyDestination;
+  }
+
+  return null;
+}
+
+/**
+ * Função auxiliar para inserir carrossel nas mensagens
+ * @param {string} placeName - Nome do local para mostrar no carrossel
+ */
+function insertCarouselInMessages(placeName) {
+  // Verificar se temos o módulo de carrossel disponível
+  if (typeof startCarousel !== "function") {
+    console.warn(
+      "[insertCarouselInMessages] Função startCarousel não encontrada"
+    );
+    return;
+  }
+
+  try {
+    // Importar módulo para exibir carrossel
+    import("../../utils/carousel.js")
+      .then((module) => {
+        if (typeof module.showCarouselInAssistant === "function") {
+          module.showCarouselInAssistant(placeName);
+        } else {
+          console.warn(
+            "[insertCarouselInMessages] showCarouselInAssistant não encontrado"
+          );
+        }
+      })
+      .catch((error) => {
+        console.error(
+          "[insertCarouselInMessages] Erro ao importar módulo:",
+          error
+        );
+      });
+  } catch (error) {
+    console.error(
+      "[insertCarouselInMessages] Erro ao inserir carrossel:",
+      error
+    );
+  }
 }

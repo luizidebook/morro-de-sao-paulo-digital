@@ -3,19 +3,41 @@
  * Rotaciona o mapa em 180 graus para orientação inversa mantendo os elementos legíveis
  * @param {number} lat - Latitude do usuário
  * @param {number} lon - Longitude do usuário
+ * @returns {boolean} - Indica se a operação foi bem-sucedida
  */
 export function setupInitialMapOrientation(lat, lon) {
+  console.log(
+    "[setupInitialMapOrientation] Iniciando com coordenadas:",
+    lat,
+    lon
+  );
+
   // Obter referência ao mapa global
   const map =
     window.map ||
     (typeof getMapInstance === "function" ? getMapInstance() : null);
 
-  // Verificar se temos uma referência válida ao navigationState
-  const navigationState = window.navigationState || {};
+  // Usar destino como fallback se a posição do usuário não estiver disponível
+  if (
+    (!lat || !lon || isNaN(lat) || isNaN(lon)) &&
+    window.navigationState &&
+    window.navigationState.destination
+  ) {
+    console.warn(
+      "[setupInitialMapOrientation] Usando coordenadas do destino como fallback"
+    );
+    lat = window.navigationState.destination.lat;
+    lon = window.navigationState.destination.lon;
+  }
 
-  if (!map) {
-    console.warn("[setupInitialMapOrientation] Mapa não disponível");
-    return;
+  // Verificação final de coordenadas
+  if (!lat || !lon || !map) {
+    console.error("[setupInitialMapOrientation] Dados inválidos:", {
+      map: !!map,
+      lat: lat,
+      lon: lon,
+    });
+    return false;
   }
 
   try {
@@ -24,9 +46,9 @@ export function setupInitialMapOrientation(lat, lon) {
     );
 
     // 1. Centralizar o mapa na localização do usuário com zoom adequado
-    map.setView([lat, lon], 18, { animate: false });
+    map.setView([lat, lon], 18, { animate: true });
 
-    // 2. Aplicar rotação de 180 graus ao mapa
+    // 2. Aplicar rotação de 180 graus APENAS ao mapa
     if (typeof map.setBearing === "function") {
       // Usar o plugin leaflet.mapbearing.js
       map.setBearing(180);
@@ -34,28 +56,17 @@ export function setupInitialMapOrientation(lat, lon) {
         "[setupInitialMapOrientation] Rotação aplicada via plugin: 180°"
       );
     } else {
-      // Fallback: aplicar rotação manualmente aos elementos do mapa
+      // Fallback: aplicar rotação APENAS ao tile pane (camada de mapa)
       const tilePane = document.querySelector(".leaflet-tile-pane");
-      const mapPane = document.querySelector(".leaflet-map-pane");
-      const controlPane = document.querySelector(".leaflet-control-container");
 
-      if (tilePane && mapPane) {
-        // Rotacionar o conteúdo do mapa
-        tilePane.style.transition = "transform 0.5s ease-out";
+      if (tilePane) {
+        // Definir estilos de transição para animação suave
+        const transitionStyle = "transform 0.5s ease-out";
+
+        // Rotacionar APENAS o conteúdo do mapa
+        tilePane.style.transition = transitionStyle;
         tilePane.style.transformOrigin = "center center";
-        tilePane.style.transform = "rotate(180deg) scale(-1, -1)";
-
-        // Aplicar transformação escalar para corrigir o espelhamento dos elementos
-        mapPane.style.transition = "transform 0.5s ease-out";
-        mapPane.style.transformOrigin = "center center";
-        mapPane.style.transform = "scale(-1, -1)";
-
-        // Manter controles na orientação normal
-        if (controlPane) {
-          controlPane.style.transition = "transform 0.5s ease-out";
-          controlPane.style.transformOrigin = "center center";
-          controlPane.style.transform = "rotate(-180deg) scale(-1, -1)";
-        }
+        tilePane.style.transform = "rotate(180deg)";
 
         console.log(
           "[setupInitialMapOrientation] Rotação aplicada manualmente: 180°"
@@ -68,23 +79,13 @@ export function setupInitialMapOrientation(lat, lon) {
     }
 
     // 3. Salvar o estado de rotação
-    if (navigationState) {
-      navigationState.currentHeading = 180;
-      navigationState.isRotationEnabled = true;
+    if (window.navigationState) {
+      window.navigationState.currentHeading = 180;
+      window.navigationState.isRotationEnabled = true;
     }
 
-    // 4. Atualizar variáveis CSS para contrabalançar a rotação em outros elementos
-    document.documentElement.style.setProperty("--map-rotation", "180deg");
-    document.documentElement.style.setProperty(
-      "--map-rotation-inverse",
-      "-180deg"
-    );
-
-    // 5. Adicionar classe ao body para permitir outros ajustes por CSS
-    document.body.classList.add("map-rotated");
-
-    // 6. Corrigir especificamente os marcadores e popups
-    adjustMarkersForRotation();
+    // Não adicionar classe ao body para evitar estilos em cascata
+    // que poderiam afetar outros elementos
 
     return true;
   } catch (error) {
@@ -97,31 +98,36 @@ export function setupInitialMapOrientation(lat, lon) {
 }
 
 /**
- * Ajusta os marcadores e outros elementos para a rotação do mapa
+ * Reinicia a orientação do mapa para o estado padrão
  */
-function adjustMarkersForRotation() {
-  // Ajustar marcadores (exceto o do usuário)
-  const markers = document.querySelectorAll(
-    ".leaflet-marker-icon:not(.user-location-marker)"
-  );
-  markers.forEach((marker) => {
-    marker.style.transform = `${marker.style.transform || ""} rotate(-180deg)`;
-    marker.dataset.rotated = "true";
-  });
+export function resetMapOrientation() {
+  try {
+    const map = window.map;
+    if (!map) return false;
 
-  // Ajustar popups
-  const popups = document.querySelectorAll(".leaflet-popup-content");
-  popups.forEach((popup) => {
-    popup.style.transform = "rotate(-180deg)";
-  });
+    // Usar plugin se disponível
+    if (typeof map.setBearing === "function") {
+      map.setBearing(0);
+      console.log("[resetMapOrientation] Rotação resetada via plugin");
+      return true;
+    }
 
-  // Ajustar controles de zoom
-  const zoomControls = document.querySelectorAll(".leaflet-control-zoom a");
-  zoomControls.forEach((control) => {
-    control.style.transform = "rotate(-180deg)";
-  });
+    // Fallback: resetar manualmente APENAS o tile pane
+    const tilePane = document.querySelector(".leaflet-tile-pane");
 
-  console.log(
-    "[adjustMarkersForRotation] Elementos do mapa ajustados para rotação"
-  );
+    if (tilePane) {
+      tilePane.style.transform = "none";
+    }
+
+    // Atualizar estado
+    if (window.navigationState) {
+      window.navigationState.currentHeading = 0;
+      window.navigationState.isRotationEnabled = false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("[resetMapOrientation] Erro ao resetar orientação:", error);
+    return false;
+  }
 }

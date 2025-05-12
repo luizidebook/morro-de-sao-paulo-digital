@@ -7,8 +7,6 @@ import {
 } from "../../i18n/translatePageContent.js";
 import { speak } from "../../utils/voice/voiceSystem.js";
 import { updateInstructionBanner } from "../../navigation/navigationUi/bannerUI.js";
-import { repositionMessagesArea } from "../../utils/ui-position.js"; // Adicionando import
-
 let lastMessageSent = { text: "", timestamp: 0 };
 
 /**
@@ -35,15 +33,10 @@ export function appendMessage(
     messageType = "standard", // Novo parâmetro para identificar o tipo de mensagem
   } = {}
 ) {
-  // Reposicionar a área de mensagens antes de adicionar a nova mensagem
-  repositionMessagesArea();
-
   // Se temos uma chave de tradução, usar para obter o conteúdo HTML
   if (translationKey) {
     htmlContent = formatText(translationKey, translationParams);
   }
-
-  // Resto do código existente...
 
   if (
     area === "messages" &&

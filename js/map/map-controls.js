@@ -12,15 +12,16 @@ import {
   appendMessage,
 } from "../assistant/assistant.js";
 import { animateMapToLocalizationUser } from "../navigation/navigationUserLocation/user-location.js";
-import { updateUserMarker } from "../navigation/navigationUserLocation/user-location.js";
+import {
+  updateUserMarker,
+  startPositionTracking,
+} from "../navigation/navigationUserLocation/user-location.js";
 import { setLastRouteData } from "../navigation/navigationState/navigationStateManager.js";
 import { dispatchActionEvent } from "../utils/ui-position.js";
 import { repositionMessagesArea } from "../utils/ui-position.js";
-import {
-  addLoadingIndicator,
-  removeLoadingIndicator,
-} from "../utils/loadingIndicator.js";
-import { calculateHaversineDistance } from "../navigation/navigationUserLocation/user-location.js";
+import { initGeolocationSystem } from "../navigation/navigationUserLocation/enhanced-geolocation.js";
+import { requestLocationPermission } from "../navigation/navigationUserLocation/enhanced-geolocation.js";
+import { hasSharedLocation } from "../navigation/navigationUserLocation/user-location.js";
 
 /* O que esse módulo cobre:
 Inicializa o mapa OpenStreetMap com Leaflet.
@@ -293,6 +294,9 @@ export function initializeMap(containerId, options = {}) {
     map.on("tileerror", (error) => {
       console.warn("[initializeMap] Erro ao carregar tile:", error);
     });
+
+    // Inicializar sistema de geolocalização avançada
+    initGeolocationSystem();
 
     console.log("[initializeMap] Mapa inicializado com sucesso");
     return map;
@@ -575,150 +579,52 @@ function flyToWithOffset(lat, lon, offsetY = 0, zoom = 16) {
   map.flyTo(newCenter, zoom, { animate: true, duration: 1.5 });
 }
 
-/**
- * Solicita permissão de GPS e rastreia a posição do usuário
- * Versão melhorada com mais tentativas
- */
-export function requestAndTrackUserLocation(
-  onSuccess = null,
-  onError = null,
+export async function requestAndTrackUserLocation(
+  onSuccess,
+  onError,
   options = {}
 ) {
-  const opts = {
-    desiredAccuracy: options.desiredAccuracy || 3000, // 3km é aceitável para turismo
-    fallbackAccuracy: options.fallbackAccuracy || 5000, // 5km se necessário
-    timeout: options.timeout || 30000, // 30 segundos
-    showNotifications: options.showNotifications !== false,
-    centerMap: options.centerMap !== false,
-    maxRetries: options.maxRetries || 1,
-  };
+  try {
+    // Solicitar permissão com experiência melhorada
+    const hasPermission = await requestLocationPermission();
 
-  // Evitar múltiplas chamadas simultâneas
-  if (window._pendingLocationRequest) {
-    console.log(
-      "[requestAndTrackUserLocation] Já existe uma solicitação em andamento, aguardando..."
-    );
-    return window._pendingLocationRequest;
-  }
-
-  // Mostrar ao usuário que estamos obtendo a localização
-  appendMessage(
-    "assistant",
-    "Para calcular a rota, preciso da sua localização atual. Estou tentando determiná-la...",
-    { speakMessage: true }
-  );
-
-  if (opts.showNotifications) {
-    showNotification("Obtendo sua localização...", "info");
-  }
-
-  let attempts = 0;
-
-  // Função que faz tentativas de obter localização
-  const attemptGetLocation = async () => {
-    try {
-      // Aumentar contador de tentativas
-      attempts++;
-
-      console.log(
-        `[requestAndTrackUserLocation] Tentativa ${attempts} de obter localização`
-      );
-
-      if (attempts > 1) {
-        appendMessage(
-          "assistant",
-          `Tentando novamente obter sua localização (tentativa ${attempts})...`,
-          { speakMessage: true }
-        );
-      }
-
-      // Solicitar localização com configurações específicas para cada tentativa
-      const location = await getBestEffortLocation(
-        opts.timeout,
-        // Aumentar limite de precisão aceitável em tentativas subsequentes
-        opts.desiredAccuracy * Math.pow(2, attempts - 1)
-      );
-
-      // Localização obtida com sucesso
-      userLocation = location;
-
-      if (opts.centerMap && map) {
-        if (typeof animateMapToLocalizationUser === "function") {
-          animateMapToLocalizationUser(location.latitude, location.longitude);
-        } else {
-          map.setView([location.latitude, location.longitude], 16);
-        }
-      }
-
-      // Atualizar marcador do usuário
-      if (typeof updateUserMarker === "function") {
-        updateUserMarker(
-          location.latitude,
-          location.longitude,
-          0,
-          location.accuracy
-        );
-      }
-
-      // Chamar callback de sucesso
-      if (typeof onSuccess === "function") {
-        onSuccess(location);
-      }
-
-      // Processar pendências de rota
-      processPendingRoute();
-
-      return location;
-    } catch (error) {
-      console.warn(
-        `[requestAndTrackUserLocation] Erro na tentativa ${attempts}:`,
-        error
-      );
-
-      // Verificar se é erro de permissão negada
-      if (error.message && error.message.includes("Permissão")) {
-        appendMessage(
-          "assistant",
-          "Você negou o acesso à sua localização. Para continuar, permita o acesso à localização nas configurações do navegador e tente novamente.",
-          { speakMessage: true }
-        );
-        throw error; // Não tentar novamente neste caso
-      }
-
-      // Se ainda temos tentativas disponíveis
-      if (attempts < opts.maxRetries + 1) {
-        return attemptGetLocation(); // Tentar novamente recursivamente
-      }
-
-      // Esgotamos as tentativas
-      appendMessage(
-        "assistant",
-        "Não consegui determinar sua localização com precisão. Você pode verificar seu GPS e tentar novamente, ou escolher um destino específico sem usar rotas.",
-        { speakMessage: true }
-      );
-
-      throw error; // Propagar o erro para o handler final
-    }
-  };
-
-  // Criar promessa para permitir awaits externos
-  window._pendingLocationRequest = attemptGetLocation()
-    .catch((finalError) => {
-      // Erro final após todas as tentativas
-      console.error("[requestAndTrackUserLocation] Erro final:", finalError);
-
+    if (!hasPermission) {
       if (typeof onError === "function") {
-        onError(finalError);
+        onError(new Error("Permissão de localização negada"));
       }
+      return null;
+    }
 
-      throw finalError; // Propagar para quem chamou a função
-    })
-    .finally(() => {
-      // Limpar referência de requisição pendente
-      window._pendingLocationRequest = null;
-    });
+    // Obter localização inicial
+    const position = await getBestEffortLocation(
+      options.timeout || 30000,
+      options.desiredAccuracy || 500
+    );
 
-  return window._pendingLocationRequest;
+    if (!position) {
+      if (typeof onError === "function") {
+        onError(new Error("Não foi possível obter sua localização"));
+      }
+      return null;
+    }
+
+    // Iniciar rastreamento contínuo
+    startPositionTracking();
+
+    // Callback de sucesso
+    if (typeof onSuccess === "function") {
+      onSuccess(position);
+    }
+
+    return position;
+  } catch (error) {
+    console.error("[requestAndTrackUserLocation] Erro:", error);
+
+    if (typeof onError === "function") {
+      onError(error);
+    }
+    return null;
+  }
 }
 
 /**
@@ -804,8 +710,7 @@ export function setupGeolocation(map) {
 export async function showRoute(destination) {
   try {
     console.log("[showRoute] Iniciando exibição de rota para:", destination);
-    // Reposicionar área de mensagens próxima ao mood icon
-    repositionMessagesArea(true);
+
     if (!destination || !destination.lat || !destination.lon) {
       console.warn("[showRoute] destino inválido:", destination);
       showNotification("Selecione um destino válido.", "error");
@@ -818,6 +723,8 @@ export async function showRoute(destination) {
     }
     // Disparar evento para notificar o gerenciador de posicionamento
     dispatchActionEvent("showRoute");
+    // Reposicionar área de mensagens próxima ao mood icon
+    repositionMessagesArea(true);
 
     const destinationLat = destination.lat;
     const destinationLon = destination.lon;
@@ -2424,4 +2331,154 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Distância em metros
+}
+
+/**
+ * Adiciona um indicador de carregamento/processamento no mapa
+ *
+ * @param {string} message - Mensagem a ser exibida no indicador
+ * @returns {Object} Referência para o elemento DOM criado
+ */
+function addLoadingIndicator(message = "Carregando...") {
+  try {
+    // Verificar se já existe um indicador ativo
+    const existingIndicator = document.getElementById("map-loading-indicator");
+    if (existingIndicator) {
+      existingIndicator.textContent = message;
+      return existingIndicator;
+    }
+
+    // Criar o elemento do indicador
+    const indicator = document.createElement("div");
+    indicator.id = "map-loading-indicator";
+    indicator.className = "map-loading-indicator";
+
+    // Adicionar spinner e texto
+    indicator.innerHTML = `
+      <div class="loading-spinner">
+        <div class="spinner"></div>
+      </div>
+      <div class="loading-text">${message}</div>
+    `;
+
+    // Adicionar estilo inline (caso o CSS não esteja carregado)
+    indicator.style.cssText = `
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 1000;
+      font-size: 14px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    `;
+
+    // Adicionar ao DOM
+    const mapContainer = getMapContainer();
+    if (mapContainer) {
+      mapContainer.appendChild(indicator);
+      console.log("[addLoadingIndicator] Indicador adicionado:", message);
+    } else {
+      // Se não encontrou o container do mapa, adicionar ao body
+      document.body.appendChild(indicator);
+      console.log(
+        "[addLoadingIndicator] Indicador adicionado ao body:",
+        message
+      );
+    }
+
+    return indicator;
+  } catch (error) {
+    console.error("[addLoadingIndicator] Erro ao criar indicador:", error);
+    return null;
+  }
+}
+
+/**
+ * Remove o indicador de carregamento do mapa
+ *
+ * @param {HTMLElement|null} indicatorElement - Referência opcional para o elemento específico
+ */
+function removeLoadingIndicator(indicatorElement = null) {
+  try {
+    // Se foi fornecido um elemento específico
+    if (indicatorElement && indicatorElement.parentNode) {
+      indicatorElement.parentNode.removeChild(indicatorElement);
+      console.log("[removeLoadingIndicator] Indicador específico removido");
+      return;
+    }
+
+    // Caso contrário, procurar por qualquer indicador ativo
+    const indicator = document.getElementById("map-loading-indicator");
+    if (indicator && indicator.parentNode) {
+      indicator.parentNode.removeChild(indicator);
+      console.log("[removeLoadingIndicator] Indicador removido");
+    }
+  } catch (error) {
+    console.error("[removeLoadingIndicator] Erro ao remover indicador:", error);
+  }
+}
+
+/**
+ * Obtém o elemento contenedor do mapa
+ * @returns {HTMLElement|null} Elemento do mapa ou null se não encontrado
+ */
+function getMapContainer() {
+  // Tentar por ID comum
+  let container = document.getElementById("map-container");
+
+  // Se não encontrou, tentar pela classe do Leaflet
+  if (!container) {
+    container = document.querySelector(".leaflet-container");
+  }
+
+  // Se ainda não encontrou e temos uma instância de mapa, tentar pelo container da instância
+  if (!container && map && typeof map.getContainer === "function") {
+    try {
+      container = map.getContainer();
+    } catch (e) {
+      console.warn(
+        "[getMapContainer] Erro ao obter container via instância de mapa:",
+        e
+      );
+    }
+  }
+
+  return container;
+}
+/**
+ * Calcula a distância Haversine (em linha reta) entre dois pontos geográficos
+ * @param {number} lat1 - Latitude do ponto 1
+ * @param {number} lon1 - Longitude do ponto 1
+ * @param {number} lat2 - Latitude do ponto 2
+ * @param {number} lon2 - Longitude do ponto 2
+ * @returns {number} Distância em metros
+ */
+function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+  // Validar coordenadas
+  if (!isValidCoordinate(lat1, lon1) || !isValidCoordinate(lat2, lon2)) {
+    console.warn("[calculateHaversineDistance] Coordenadas inválidas");
+    return 0;
+  }
+
+  const R = 6371000; // Raio da Terra em metros
+  const φ1 = (lat1 * Math.PI) / 180; // φ, λ em radianos
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c; // em metros
+
+  return distance;
 }

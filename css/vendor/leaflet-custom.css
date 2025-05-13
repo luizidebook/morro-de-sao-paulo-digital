@@ -75,8 +75,3 @@
   /* Corrigir orientação dos controles de zoom */
   transform: rotate(-180deg);
 }
-
-/* Manter o marcador do usuário com orientação normal */
-.map-rotated .user-location-marker {
-  transform: none !important;
-}

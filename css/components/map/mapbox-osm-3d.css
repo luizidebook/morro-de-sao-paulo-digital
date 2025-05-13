@@ -46,13 +46,13 @@
 
 .mapboxgl-popup-close-button {
   font-size: 18px;
-  padding: 4px;
+  padding: 0px;
 }
 
 /* Estilos para controles 3D melhorados */
 .mapbox-3d-controls {
   position: absolute;
-  top: 10px;
+  top: 40px;
   right: 10px;
   z-index: 400;
   display: flex;
@@ -171,27 +171,4 @@
   100% {
     transform: rotate(360deg);
   }
-}
-
-/* Add these styles to your mapbox-osm-3d.css file */
-
-.mapbox-3d-marker {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-.mapbox-3d-marker i {
-  font-size: 24px;
-  color: #3b82f6;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
-}
-
-.mapbox-3d-marker.user-location-marker i {
-  color: #10b981; /* Green color for user location */
-  font-size: 28px;
 }

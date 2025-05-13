@@ -131,8 +131,6 @@ function initApp() {
   });
 }
 
-// Replace the existing initializeMap3DControls function
-
 /**
  * Initialize 3D map controls with proper checks
  */
@@ -141,43 +139,56 @@ function initializeMap3DControls() {
   document.addEventListener(
     "mapbox3d:ready",
     () => {
+      console.log("[main] 3D map is ready, initializing controls");
+
+      // Ensure the global reference exists
+      if (window.mapbox3dInstance) {
+        console.log("[main] Using existing mapbox3dInstance from window");
+      } else {
+        // Try to get it from the event
+        const mapEvent = new CustomEvent("mapbox3d:getinstance");
+        document.dispatchEvent(mapEvent);
+
+        if (mapEvent.detail && mapEvent.detail.instance) {
+          window.mapbox3dInstance = mapEvent.detail.instance;
+          console.log("[main] Retrieved mapbox3dInstance from event");
+        }
+      }
+
       import("./js/map/map-controls-3d.js")
         .then((module) => {
           if (typeof module.initMap3DControls === "function") {
-            // Get map instance
+            // Explicitly set the global reference
             const mapbox3d = window.mapbox3dInstance;
-            const leafletMap = window.map;
 
             module.initMap3DControls({
-              mapInstance: leafletMap,
               mapbox3dInstance: mapbox3d,
             });
+
             console.log("[main] 3D controls initialized successfully");
 
-            // Now that everything is ready, hide the loading overlay
+            // Hide loading overlay after a small delay to ensure everything is visible
             setTimeout(() => {
-              if (typeof window.hideLoadingOverlay === "function") {
-                window.hideLoadingOverlay();
-              } else {
-                const loadingOverlay =
-                  document.getElementById("loading-overlay");
-                if (loadingOverlay) {
-                  loadingOverlay.classList.add("fade-out");
-                }
+              if (document.getElementById("loading-overlay")) {
+                document
+                  .getElementById("loading-overlay")
+                  .classList.add("fade-out");
               }
-            }, 500); // Small delay to ensure map is visible
+            }, 500);
           }
         })
         .catch((error) => {
           console.error("[main] Error loading 3D controls:", error);
           // Hide loading on error
-          if (typeof window.hideLoadingOverlay === "function") {
-            window.hideLoadingOverlay();
+          if (document.getElementById("loading-overlay")) {
+            document
+              .getElementById("loading-overlay")
+              .classList.add("fade-out");
           }
         });
     },
     { once: true }
-  ); // Only run once
+  );
 }
 
 // Replace the existing autoInit3DMode function

@@ -30,11 +30,6 @@
   transform: rotate(-180deg) !important;
 }
 
-/* Manter o marcador do usuário com orientação normal mas invertido */
-.map-rotated .user-location-marker {
-  transform: scale(-1, -1) !important;
-}
-
 /* Corrigir a camada de overlays */
 .map-rotated .leaflet-overlay-pane {
   transform: rotate(180deg) scale(-1, -1) !important;
@@ -337,19 +332,18 @@ body.map-3d-mode .leaflet-control {
   }
 }
 
-/* Open map3d.css and find any instances of -ms-high-contrast */
-
-/* REPLACE THIS: */
-@media (-ms-high-contrast: active) {
-  /* styles... */
-}
-
-/* WITH THIS: */
-/* Substitua o uso de -ms-high-contrast */
+/* Estilos para o botão de alternância do modo 3D */
 @media (forced-colors: active) {
   /* Estilos para modo de alto contraste */
-  body {
-    background-color: Window;
-    color: WindowText;
+  .mapbox-3d-container {
+    border: 2px solid currentColor;
   }
-} /* same styles... */
+
+  .user-marker-3d {
+    forced-color-adjust: none;
+  }
+
+  .direction-indicator {
+    background-color: LinkText;
+  }
+}

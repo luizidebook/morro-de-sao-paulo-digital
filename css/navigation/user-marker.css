@@ -1,136 +1,60 @@
-/* Estilos do marcador do usuário */
-.user-marker {
+/* Estilos consolidados para marcadores do usuário - 2D e 3D */
+
+/* Base para todos os marcadores do usuário */
+.user-marker,
+.mapbox-user-marker,
+.user-location-marker,
+.user-location-arrow {
+  transform-origin: center center;
   transition: transform 0.3s ease-out;
-  fill: #ff0000 !important; /* Forçar cor vermelha */
-}
-.user-marker path {
-  fill: #ff0000 !important; /* Forçar cor vermelha */
-}
-/* Efeitos de pulso */
-.pulse {
-  animation-duration: 2s;
-  animation-iteration-count: infinite;
+  will-change: transform;
 }
 
-.pulse-normal {
-  animation-name: pulse-blue;
+/* Específico para marcadores 3D */
+.mapbox-user-marker {
+  cursor: default;
+  pointer-events: none;
 }
 
-.pulse-alert {
-  animation-name: pulse-orange;
+/* SVG dentro dos marcadores */
+.user-location-arrow svg,
+.mapbox-user-marker svg {
+  filter: drop-shadow(0px 2px 3px rgba(0, 0, 0, 0.5));
 }
 
-.pulse-arrival {
-  animation-name: pulse-green;
-}
-
-@keyframes pulse-blue {
+/* Animações compartilhadas */
+@keyframes pulse-marker {
   0% {
-    filter: drop-shadow(0 0 0px rgba(66, 133, 244, 0.8));
+    transform: scale(1);
   }
   50% {
-    filter: drop-shadow(0 0 6px rgba(66, 133, 244, 0.8));
+    transform: scale(1.1);
   }
   100% {
-    filter: drop-shadow(0 0 0px rgba(66, 133, 244, 0.8));
+    transform: scale(1);
   }
 }
 
-@keyframes pulse-orange {
+.marker-pulse {
+  animation: pulse-marker 0.6s ease-in-out;
+}
+
+@keyframes highlight-marker {
   0% {
-    filter: drop-shadow(0 0 0px rgba(202, 0, 0, 0.8));
-  }
-  50% {
-    filter: drop-shadow(0 0 8px rgba(202, 0, 0, 0.8));
+    filter: brightness(1.5) drop-shadow(0 0 5px rgba(255, 255, 0, 0.8));
   }
   100% {
-    filter: drop-shadow(0 0 0px rgba(202, 0, 0, 0.8));
+    filter: brightness(1) drop-shadow(0 0 0px rgba(255, 255, 0, 0));
   }
 }
 
-@keyframes pulse-green {
-  0% {
-    filter: drop-shadow(0 0 0px rgba(34, 170, 68, 0.8));
-  }
-  50% {
-    filter: drop-shadow(0 0 8px rgba(34, 170, 68, 0.8));
-  }
-  100% {
-    filter: drop-shadow(0 0 0px rgba(34, 170, 68, 0.8));
-  }
+.fresh-marker {
+  animation: highlight-marker 1s ease-in-out;
 }
 
-/* Suavizar movimento */
-.leaflet-marker-icon {
-  transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-
-/* Efeito de rotação suave */
-.user-marker.rotating {
-  transition: transform 0.5s ease-out;
-}
-
-/* Estilos específicos por tipo de marcador */
-.default-marker {
-}
-.navigation-marker {
-}
-.arrival-marker {
-}
-.searching-marker {
-}
-.precise-marker {
-}
-
-/* Ajuste para dispositivos de tela pequena */
-@media (max-width: 375px) {
-  .user-marker {
-    transform: scale(0.85);
-  }
-}
-/* Adicionar ao arquivo user-marker.css ou navigationUserLocation.css */
-.signal-lost .instruction-primary {
-  opacity: 0.7;
-}
-
-.signal-lost:after {
-  content: "Sinal GPS fraco";
-  display: block;
-  font-size: 0.8rem;
-  background: #f84a00;
-  color: white;
-  padding: 2px 8px;
-  text-align: center;
-}
-
-/* Estilos para exibir estados de precisão */
-.accuracy-high .accuracy-circle {
-  border-color: #22aa44;
-}
-
-.accuracy-medium .accuracy-circle {
-  border-color: #4285f4;
-}
-
-.accuracy-low .accuracy-circle {
-  border-color: #ff2200;
-}
-
-/* Adicionar ao arquivo user-marker.css */
-
-/* Estilos para o marcador em modo 3D */
-.immersive-mode .user-marker {
-  transform-origin: center;
-  /* Ajuste específico para modo 3D */
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-}
-
-/* Animação para transição entre modos */
-.user-marker.transitioning {
-  transition: all 0.5s ease-in-out;
-}
-
-/* Estilos específicos para marcador 3D */
-.user-marker.three-d {
-  /* Estilos específicos para o marcador em 3D */
+/* Corrigir comportamento em mapa rotacionado */
+.map-rotated .user-location-marker,
+.map-rotated .mapbox-user-marker {
+  /* Preservar a orientação independente da rotação do mapa */
+  transform-origin: center center !important;
 }

@@ -194,6 +194,47 @@ href="https://unpkg.com/swiper/swiper-bundle.min.css"
   };
 </script>
 
+<!-- Após os scripts do Leaflet -->
+<script>
+  // Token do Mapbox (mantenha seguro em produção)
+  window.mapboxToken = 'pk.eyJ1IjoibW9ycm9kaWdpdGFsIiwiYSI6ImNscWEzaHVnNzAwbjIyanBmeGE1bXY0aTYifQ.3f3nf3e8QnHRH7whYn5ljg';
+
+  // Garantir que o mapboxgl esteja disponível globalmente
+  window.initMapboxGL = function() {
+    if (!window.mapboxgl) {
+      console.log('[initMapboxGL] Carregando Mapbox GL JS...');
+      const script = document.createElement('script');
+      script.src = 'https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js';
+      script.onload = function() {
+        console.log('[initMapboxGL] Mapbox GL JS carregado com sucesso');
+        // Configurar o token de acesso
+        mapboxgl.accessToken = window.mapboxToken;
+        // Disparar evento para notificar que o Mapbox GL está pronto
+        document.dispatchEvent(new CustomEvent('mapboxgl:loaded'));
+      };
+      script.onerror = function() {
+        console.error('[initMapboxGL] Erro ao carregar Mapbox GL JS');
+      };
+      document.head.appendChild(script);
+      
+      // Adicionar o CSS
+      const link = document.createElement('link');
+      link.href = 'https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css';
+      link.rel = 'stylesheet';
+      document.head.appendChild(link);
+    } else {
+      console.log('[initMapboxGL] Mapbox GL JS já está carregado');
+      mapboxgl.accessToken = window.mapboxToken;
+      document.dispatchEvent(new CustomEvent('mapboxgl:loaded'));
+    }
+  };
+  
+  // Inicializar o Mapbox GL quando a página carregar
+  document.addEventListener('DOMContentLoaded', function() {
+    window.initMapboxGL();
+  });
+</script>
+
     <!-- Scripts principais -->
     <script type="module" src="./main.js"></script>
 

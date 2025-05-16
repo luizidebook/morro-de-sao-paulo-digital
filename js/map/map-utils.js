@@ -9,15 +9,31 @@ import { map } from "../map/mapManager.js"; // Instância do mapa Leaflet
  * @param {number} lon
  * @param {number} offsetY - deslocamento em pixels (positivo para cima)
  * @param {number} zoom
+ * @param {object} mapInstance - instância do mapa (opcional)
  */
-export function flyToWithOffset(lat, lon, offsetY = -10, zoom = 16) {
-  if (!map) return;
-  // Converte lat/lon para ponto na tela
-  const targetPoint = map.project([lat, lon], zoom);
-  // Aplica o offset vertical
-  targetPoint.y = targetPoint.y + offsetY;
-  // Converte de volta para lat/lon
-  const newCenter = map.unproject(targetPoint, zoom);
+export function flyToWithOffset(
+  lat,
+  lng,
+  offsetY = -10,
+  zoom = 16,
+  mapInstance
+) {
+  // Usar o mapa fornecido ou obter do módulo map-init
+  const map =
+    mapInstance ||
+    window.map ||
+    (typeof getMapInstance === "function" ? getMapInstance() : null);
+
+  if (!map) {
+    console.error("[flyToWithOffset] Mapa não encontrado");
+    return;
+  }
+
+  // Calcular o ponto central ajustado
+  const point = map.project([lat, lng], zoom).subtract([0, offsetY]);
+  const newCenter = map.unproject(point, zoom);
+
+  // Aplicar a visualização
   map.flyTo(newCenter, zoom, { animate: true, duration: 1.5 });
 }
 

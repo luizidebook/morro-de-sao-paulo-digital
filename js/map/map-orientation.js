@@ -12,15 +12,7 @@ export function setupInitialMapOrientation(lat, lon) {
 
   // Verificar se temos uma referência válida ao navigationState
   const navigationState = window.navigationState || {};
-  // Em navigationController.js
-  if (!window.navigationState) {
-    window.navigationState = {
-      isActive: false,
-      isPaused: false,
-      is3DModeEnabled: true, // Padrão já definido como true
-      // ... outras propriedades ...
-    };
-  }
+
   if (!map) {
     console.warn("[setupInitialMapOrientation] Mapa não disponível");
     return;

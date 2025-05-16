@@ -63,5 +63,17 @@ export function initializeMap(containerId, options = {}) {
 }
 
 export function getMapInstance() {
-  return map;
+  return map || window.map;
+}
+
+/**
+ * Atualiza a referência interna da instância do mapa
+ * Útil quando o mapa é recriado ou trocado entre 2D e 3D
+ * @param {Object} mapInstance - Nova instância do mapa
+ */
+export function updateMapReference(mapInstance) {
+  if (mapInstance) {
+    map = mapInstance;
+    console.log("[map-init] Referência de mapa atualizada");
+  }
 }

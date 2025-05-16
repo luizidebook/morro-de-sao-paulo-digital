@@ -1,4 +1,4 @@
-import { getMapInstance } from "./map-init.js";
+import { map } from "./map-init.js";
 import { flyToWithOffset } from "./map-utils.js";
 /**
  * Módulo de Marcadores do Mapa
@@ -15,20 +15,15 @@ let userPopupShown = false;
  * Limpa todos os marcadores e rotas existentes no mapa.
  */
 export function clearMarkers() {
-  // Obter instância de mapa dinamicamente
-  const mapInstance = getMapInstance() || window.map;
-  if (!mapInstance) {
-    console.error(
-      "[clearMarkers] Mapa não encontrado. Verificando window.map:",
-      window.map
-    );
+  if (!map) {
+    console.error("[clearMarkers] map não está inicializado.");
     return;
   }
 
   markers.forEach((marker) => {
     // Remove todos os marcadores, exceto o marcador da localização do usuário
     if (marker.options?.title !== "Sua localização") {
-      mapInstance.removeLayer(marker);
+      map.removeLayer(marker);
     }
   });
 
@@ -49,10 +44,8 @@ export function clearMarkers() {
  * @param {number} lon - Longitude da localização
  */
 export function showLocationOnMap(locationName, lat, lon) {
-  // Obter instância de mapa dinamicamente
-  const mapInstance = getMapInstance() || window.map;
-  if (!mapInstance) {
-    console.error("[showLocationOnMap] Mapa não encontrado.");
+  if (!map) {
+    console.error("[showLocationOnMap] map não está inicializado.");
     return;
   }
 
@@ -76,13 +69,13 @@ export function showLocationOnMap(locationName, lat, lon) {
       return;
     }
 
-    const marker = window.L.marker([lat, lon], { icon }).addTo(mapInstance);
+    const marker = window.L.marker([lat, lon], { icon }).addTo(map);
     marker.bindPopup(`<h3>${locationName}</h3>`).openPopup(); // Exibe apenas o nome do local
     markers.push(marker);
 
     // 10% do mapa para cima (em pixels)
-    const offsetY = mapInstance.getSize().y * 0.3;
-    flyToWithOffset(lat, lon, offsetY, 16, mapInstance);
+    const offsetY = map.getSize().y * 0.3;
+    flyToWithOffset(lat, lon, offsetY, 16);
   } catch (error) {
     console.error("[showLocationOnMap] Erro ao adicionar marcador:", error);
   }
@@ -93,13 +86,6 @@ export function showLocationOnMap(locationName, lat, lon) {
  * @param {Array} locations - Lista de locais com nome, latitude e longitude.
  */
 export function showAllLocationsOnMap(locations) {
-  // Obter instância de mapa dinamicamente
-  const mapInstance = getMapInstance() || window.map;
-  if (!mapInstance) {
-    console.error("[showAllLocationsOnMap] Mapa não encontrado.");
-    return;
-  }
-
   clearMarkers();
 
   if (!locations || locations.length === 0) {
@@ -130,7 +116,7 @@ export function showAllLocationsOnMap(locations) {
     }
 
     const icon = getMarkerIconForLocation(name.toLowerCase());
-    const marker = window.L.marker([lat, lon], { icon }).addTo(mapInstance);
+    const marker = window.L.marker([lat, lon], { icon }).addTo(map);
     marker.bindPopup(`<h3>${name}</h3>`);
     markers.push(marker);
 
@@ -139,18 +125,12 @@ export function showAllLocationsOnMap(locations) {
 
   // Ajusta os bounds sem animação
   if (bounds.isValid()) {
-    mapInstance.fitBounds(bounds, { padding: [40, 40], animate: false });
+    map.fitBounds(bounds, { padding: [40, 40], animate: false });
     setTimeout(() => {
       // Após o fitBounds, ajusta o centro com offset, mas mantém o zoom atual
       const center = bounds.getCenter();
-      const offsetY = mapInstance.getSize().y * 0.1;
-      flyToWithOffset(
-        center.lat,
-        center.lng,
-        offsetY,
-        mapInstance.getZoom(),
-        mapInstance
-      );
+      const offsetY = map.getSize().y * 0.1;
+      flyToWithOffset(center.lat, center.lng, offsetY, map.getZoom());
     }, 0); // sem delay perceptível
   }
 }
@@ -170,43 +150,60 @@ export function highlightMarker(locationName) {
   }
 }
 
-/**
- * getMarkerIconForLocation
- * ------------------------------------------------------------
- * Seleciona o ícone apropriado com base no tipo de localização usando Font Awesome.
- * Retorna um objeto divIcon do Leaflet.
- *
- * @param {string} name - Nome do local.
- * @returns {Object} Configuração do ícone.
- */
 export function getMarkerIconForLocation(name) {
-  let iconClass = "fa-map-marker-alt"; // Ícone padrão
+  let iconHtml =
+    '<i class="fas fa-map-marker-alt" style="font-size: 24px; color: #3b82f6;"></i>'; // HTML padrão
+  let className = "custom-marker-icon";
+  let iconSize = [24, 24];
+  let iconAnchor = [12, 24];
+  let popupAnchor = [0, -24];
+
+  // SVG para a seta vermelha do usuário
+  const redArrowSvg =
+    '<svg viewBox="0 0 24 24" width="32" height="32" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="rgba(0, 0, 0, 0.2)" stroke="#ffffff" stroke-width="1"/><circle cx="12" cy="12" r="3" fill="#ffffff" fill-opacity="0.9"/><path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z" fill="#ff0000" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round" /></svg>';
 
   if (name.includes("praia")) {
-    iconClass = "fa-umbrella-beach";
+    iconHtml =
+      '<i class="fas fa-umbrella-beach" style="font-size: 24px; color: #3b82f6;"></i>';
   } else if (name.includes("restaurante") || name.includes("sabores")) {
-    iconClass = "fa-utensils";
+    iconHtml =
+      '<i class="fas fa-utensils" style="font-size: 24px; color: #3b82f6;"></i>';
   } else if (
     name.includes("pousada") ||
     name.includes("hotel") ||
     name.includes("vila")
   ) {
-    iconClass = "fa-bed";
+    iconHtml =
+      '<i class="fas fa-bed" style="font-size: 24px; color: #3b82f6;"></i>';
   } else if (name.includes("atração") || name.includes("farol")) {
-    iconClass = "fa-mountain";
+    iconHtml =
+      '<i class="fas fa-mountain" style="font-size: 24px; color: #3b82f6;"></i>';
   } else if (name.includes("loja") || name.includes("mercado")) {
-    iconClass = "fa-shopping-bag";
+    iconHtml =
+      '<i class="fas fa-shopping-bag" style="font-size: 24px; color: #3b82f6;"></i>';
   } else if (name.includes("hospital") || name.includes("polícia")) {
-    iconClass = "fa-ambulance";
+    iconHtml =
+      '<i class="fas fa-ambulance" style="font-size: 24px; color: #3b82f6;"></i>';
+  } else if (
+    name.includes("pessoa") ||
+    name.includes("você") ||
+    name.includes("usuário")
+  ) {
+    // Usar a seta vermelha SVG em vez do ícone Font Awesome
+    iconHtml = redArrowSvg;
+    className = "user-location-marker";
+    iconSize = [32, 32];
+    iconAnchor = [16, 16]; // Centralizar o ícone nas coordenadas
+    popupAnchor = [0, -16]; // Ajuste do ponto de ancoragem do popup
   }
 
-  // Retorna um ícone do Leaflet com Font Awesome
+  // Retorna um ícone do Leaflet com o HTML apropriado
   return window.L.divIcon({
-    html: `<i class="fas ${iconClass}" style="font-size: 24px; color: #3b82f6;"></i>`,
-    className: "custom-marker-icon",
-    iconSize: [24, 24],
-    iconAnchor: [12, 24],
-    popupAnchor: [0, -24],
+    html: iconHtml,
+    className: className,
+    iconSize: iconSize,
+    iconAnchor: iconAnchor,
+    popupAnchor: popupAnchor,
   });
 }
 

@@ -5,7 +5,6 @@ import {
   showAllLocationsOnMap,
   requestAndTrackUserLocation,
   showRoute,
-  isUsing3DMap,
 } from "../../map/map-controls.js";
 import { fetchOSMData } from "../../map/osm-service.js";
 import {
@@ -24,7 +23,7 @@ import {
   getHistory,
 } from "../assistant-context/context-manager.js";
 import { startCarousel } from "../../utils/carousel.js";
-import { startNavigationIn3DMode } from "../../navigation/navigationController/navigation3D.js";
+import { startNavigation } from "../../navigation/navigationController/navigationController.js";
 import { clearAssistantMessages } from "../assistant.js";
 import {
   getGeneralText,
@@ -41,13 +40,6 @@ import {
   getDefaultResponse,
   formatHistoryMessage,
 } from "../assistant-messages/assistant-messages.js";
-
-// Add the 3D map import
-import {
-  is3DModeActive,
-  enable3DMode,
-  disable3DMode,
-} from "../../map/map-3d.js";
 
 // Novas queries Overpass (use exatamente estas chaves)
 const queries = {
@@ -68,7 +60,7 @@ const queries = {
 };
 
 // Função utilitária para filtrar locais pelo raio de 10km do ponto central
-export function isWithinRadius(
+function isWithinRadius(
   lat,
   lon,
   centerLat = -13.376,
@@ -321,114 +313,6 @@ export async function processUserInput(input, context = {}) {
   const normalized = input.trim().toLowerCase();
   const rotaRegex =
     /(como chegar|chegar|criar rota|rota|ir para|como vou para|route to|go to)/i;
-
-  // Handle 3D map mode toggle requests
-  if (
-    normalized.includes("ativar modo 3d") ||
-    normalized.includes("mostrar em 3d") ||
-    normalized.includes("visualização 3d") ||
-    normalized.includes("enable 3d")
-  ) {
-    return {
-      text: "Ativando visualização 3D do mapa...",
-      action: async () => {
-        try {
-          const result = await enable3DMode({
-            pitch: 60,
-            bearing: -15,
-            animationDuration: 1500,
-          });
-          console.log("[processUserInput] Resultado da ativação 3D:", result);
-
-          // If the user was looking at a specific place, show it in 3D
-          if (ctx.lastPlace) {
-            const place = allPlaces.find(
-              (p) => p.name.toLowerCase() === ctx.lastPlace.toLowerCase()
-            );
-            if (place) {
-              showLocationOnMap(place.name, place.lat, place.lon);
-            }
-          }
-        } catch (error) {
-          console.error("[processUserInput] Erro ao ativar modo 3D:", error);
-        }
-      },
-    };
-  }
-
-  if (
-    normalized.includes("desativar modo 3d") ||
-    normalized.includes("desativar 3d") ||
-    normalized.includes("modo 2d") ||
-    normalized.includes("disable 3d")
-  ) {
-    return {
-      text: "Voltando para visualização normal do mapa...",
-      action: async () => {
-        try {
-          await disable3DMode();
-
-          // If the user was looking at a specific place, show it in 2D
-          if (ctx.lastPlace) {
-            const place = allPlaces.find(
-              (p) => p.name.toLowerCase() === ctx.lastPlace.toLowerCase()
-            );
-            if (place) {
-              setTimeout(() => {
-                showLocationOnMap(place.name, place.lat, place.lon);
-              }, 500);
-            }
-          }
-        } catch (error) {
-          console.error("[processUserInput] Erro ao desativar modo 3D:", error);
-        }
-      },
-    };
-  }
-
-  // Add handling for 3D-specific queries like "show me a 3D view of [place]"
-  if (
-    (normalized.includes("visualizar em 3d") ||
-      normalized.includes("ver em 3d") ||
-      normalized.includes("mostrar em 3d")) &&
-    !isUsing3DMap()
-  ) {
-    // Check if there's a place mentioned
-    const place = allPlaces.find((loc) =>
-      normalized.includes(loc.name.toLowerCase())
-    );
-
-    if (place) {
-      return {
-        text: `Ativando visualização 3D para ${place.name}...`,
-        action: async () => {
-          try {
-            await enable3DMode({
-              pitch: 60,
-              bearing: -15,
-              animationDuration: 1500,
-            });
-
-            // Short delay to ensure 3D mode is fully initialized
-            setTimeout(() => {
-              showLocationOnMap(place.name, place.lat, place.lon);
-            }, 1000);
-          } catch (error) {
-            console.error(
-              "[processUserInput] Erro ao ativar modo 3D para local:",
-              error
-            );
-          }
-        },
-        context: { lastPlace: place.name },
-      };
-    } else {
-      return {
-        text: "Posso mostrar locais em 3D. Qual local específico você gostaria de ver?",
-        options: ["Praias em 3D", "Restaurantes em 3D", "Hotéis em 3D"],
-      };
-    }
-  }
 
   // Exemplo: Resposta contextual para favoritos
   if (
@@ -798,7 +682,7 @@ export async function processUserInput(input, context = {}) {
     return {
       text: messageText,
       action: () => {
-        startNavigationIn3DMode(destino);
+        startNavigation(destino);
       },
     };
   }

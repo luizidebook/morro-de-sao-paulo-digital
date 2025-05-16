@@ -57,27 +57,16 @@ export let map;
 export let userMarker = null; // Marcador do usuário
 export let userLocationMarker = null; // Marcador da localização do usuário
 
-// Atualizar os imports para usar o adaptador
-import { getActiveMapInstance } from "./map-mode-adapter.js";
-import {
-  showLocationOnActiveMap,
-  showAllLocationsOnActiveMap,
-  showRouteOnActiveMap,
-} from "./map-mode-adapter.js";
-
-// Exportar as funções adaptadas
-export {
-  getActiveMapInstance as getMapInstance,
-  showLocationOnActiveMap as showLocation,
-  showAllLocationsOnActiveMap as showAllLocations,
-  showRouteOnActiveMap as showRoute,
-};
-
 // --- map-init.js ---
-export { initializeMap } from "./map-init.js";
+export { initializeMap, getMapInstance } from "./map-init.js";
 
 // --- map-markers.js ---
-export { clearMarkers, highlightMarker } from "./map-markers.js";
+export {
+  clearMarkers,
+  showLocationOnMap,
+  showAllLocationsOnMap,
+  highlightMarker,
+} from "./map-markers.js";
 
 // --- user-location.js ---
 export {
@@ -89,7 +78,7 @@ export {
 export { getBestEffortLocation } from "../navigation/navigationUserLocation/enhanced-geolocation.js";
 
 // --- map-routes.js ---
-export { plotRouteOnMap } from "./map-controls.js";
+export { showRoute, plotRouteOnMap } from "./map-controls.js";
 
 // --- map-utils.js ---
 export { flyToWithOffset, isWithinRadius } from "./map-utils.js";

@@ -21,9 +21,9 @@
 #assistant-messages {
   /* Posicionamento */
   position: fixed;
-  left: 40%; /* CORRETO */
-  top: 1%; /* CORRETO */
-  transform: translateX(-50%); /* CORRETO - centraliza horizontalmente */
+  left: 37%;
+  top: 40%;
+  transform: translateX(-50%);
   z-index: var(--z-overlay, 1000);
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   /* Dimensões */
@@ -226,7 +226,7 @@
   max-height: 80vh;
   height: auto;
   z-index: 1000;
-  top: 30%;
+  top: 1%;
 }
 
 #assistant-messages.showing-carousel .carousel-container {
@@ -235,7 +235,6 @@
   padding: 0;
   overflow: hidden;
   border-radius: 0.8rem;
-  margin: 0.5rem 0;
   z-index: 10000;
 }
 
@@ -525,10 +524,10 @@ body.dark-theme #assistant-messages .message.user,
 /* Telas pequenas (smartphones) */
 @media (max-width: 480px) {
   #assistant-messages {
-    min-width: 70%;
+    min-width: 4%;
     max-width: 95%;
-    max-height: 170vh;
-    top: 1%;
+    max-height: 70vh;
+    top: 40%;
   }
 
   .assistant-input-area {
@@ -545,9 +544,8 @@ body.dark-theme #assistant-messages .message.user,
 /* Telas muito pequenas */
 @media (max-width: 320px) {
   #assistant-messages {
-    min-width: 65%;
-    top: 1%;
-    max-height: 160vh;
+    min-width: 95%;
+    top: 40%;
   }
 
   .assistant-input-area {
@@ -564,7 +562,7 @@ body.dark-theme #assistant-messages .message.user,
 /* Modo paisagem */
 @media (orientation: landscape) and (max-height: 600px) {
   #assistant-messages {
-    top: 1%;
+    top: 20%;
     max-height: 60vh;
   }
 
@@ -619,22 +617,4 @@ body.dark-theme #assistant-messages .message.user,
   min-height: auto !important;
   max-height: none !important;
   overflow-y: visible !important;
-}
-
-/* Garantir que a classe repositioned mantenha o posicionamento correto */
-#assistant-messages.repositioned {
-  height: auto !important;
-  min-height: auto !important;
-  max-height: 80vh !important;
-  left: 39% !important;
-  top: 1% !important;
-  transform: translateX(-50%) !important;
-  position: fixed !important;
-}
-
-#assistant-messages.repositioned .messages-area {
-  height: auto !important;
-  min-height: auto !important;
-  max-height: 60vh !important;
-  overflow-y: auto !important;
 }

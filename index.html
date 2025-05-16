@@ -4,17 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#3b82f6" />
-    <meta name="msapplication-navbutton-color" content="#3b82f6">
-    <meta name="apple-mobile-web-app-status-bar-style" content="#3b82f6">
+<!-- Por: -->
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#3b82f6">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1e40af">    <meta name="apple-mobile-web-app-status-bar-style" content="#3b82f6">
     <meta
       name="description"
       content="Guia digital interativo de Morro de São Paulo"
     />
     <title>Morro de São Paulo Digital</title>
     <link rel="stylesheet" href="./css/main.css" />
-    <link rel="stylesheet" href="./css/components/accessibility.css" />
-    <link rel="stylesheet" href="./css/vendor-fixes.css" />
-    <link rel="stylesheet" href="css/components/map/mapbox-osm-3d.css">
   
 <!-- Carregar Leaflet primeiro (versão única) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -23,8 +21,12 @@
 <!-- Adicionar plugins necessários para rotação -->
 <script src="./js/plugins/leaflet.rotatedMarker.js"></script>
 <script src="./js/plugins/leaflet.mapbearing.js"></script>
-<!-- Carregar o plugin polylineDecorator apenas uma vez -->
-<script src="./js/lib/leaflet.polylineDecorator.js"></script>
+  <link
+    href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"
+    rel="stylesheet"
+  />
+
+<script async src="https://docs.opencv.org/4.5.4/opencv.js"></script>
 
 <link
 rel="stylesheet"
@@ -97,6 +99,162 @@ href="https://unpkg.com/swiper/swiper-bundle.min.css"
         max-width: 80%;
       }
     </style>
+
+    <style>
+      @media (forced-colors: active) {
+        button, 
+        .mapboxgl-ctrl-icon, 
+        .mapboxgl-ctrl button,
+        .custom-3d-control button {
+          forced-color-adjust: none;
+          color: CanvasText;
+          background-color: ButtonFace;
+          border-color: ButtonBorder;
+        }
+        
+        button:hover,
+        .mapboxgl-ctrl button:hover {
+          background-color: Highlight;
+          color: HighlightText;
+        }
+        
+        .custom-3d-control button.following {
+          background-color: Highlight;
+          color: HighlightText;
+        }
+        
+        .custom-3d-control button i {
+          color: currentColor;
+        }
+      }
+    </style>
+
+    <style>
+  /* Estilos para o popup "Você está aqui!" */
+  .you-are-here-popup .mapboxgl-popup-content {
+    background: #4CAF50;
+    color: white;
+    font-weight: bold;
+    padding: 10px 15px;
+    border-radius: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    font-family: Arial, sans-serif;
+    text-align: center;
+  }
+  
+  .you-are-here-popup .mapboxgl-popup-tip {
+    border-top-color: #4CAF50;
+  }
+  
+  /* Estilos para os botões ativos */
+  .mapboxgl-ctrl button.active,
+  .satellite-imagery-control.active,
+  .mapboxgl-ctrl button.following {
+    background-color: #4CAF50 !important;
+  }
+  
+  .mapboxgl-ctrl button.active i,
+  .satellite-imagery-control.active i,
+  .mapboxgl-ctrl button.following i {
+    color: white !important;
+  }
+</style>
+
+    <!-- TensorFlow.js otimizado - adicionar antes do fechamento da tag head -->
+    <script>
+        // Configuração global TensorFlow
+        window.tfConfig = {
+            models: {
+                // Versões alternativas de modelos para uso local ou via CDN
+                superResolution: {
+                    localPath: './assets/models/esrgan-tf2/',
+                    cdnPath: 'https://storage.googleapis.com/tfjs-models/savedmodel/esrgan-tf2/',
+                    modelType: 'tfjs'
+                }
+            },
+            useCDN: true,  // Se true, tenta CDN primeiro; se false, tenta local primeiro
+            useLocalOnly: false  // Se true, usa apenas modelos locais
+        };
+    </script>
+    
+    <!-- Carregar TensorFlow.js de forma otimizada -->
+    <script async defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.15.0/dist/tf.min.js" 
+            onerror="document.body.classList.add('tf-not-available');"
+            onload="document.body.classList.add('tf-loaded');"></script>
+
+    <!-- Detector de Capacidades -->
+    <script>
+        // Verificar capacidades do navegador para recursos avançados
+        window.appCapabilities = {
+            tensorflow: false,
+            webgl: false,
+            serviceWorker: 'serviceWorker' in navigator,
+            localStorage: !!window.localStorage,
+            webpSupport: false
+        };
+        
+        // Verificar WebGL (necessário para TensorFlow.js)
+        try {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            window.appCapabilities.webgl = !!gl;
+        } catch (e) {
+            console.warn('WebGL não suportado');
+        }
+        
+        // Verificar suporte a WebP
+        const webpImg = new Image();
+        webpImg.onload = function() { window.appCapabilities.webpSupport = true; };
+        webpImg.onerror = function() { window.appCapabilities.webpSupport = false; };
+        webpImg.src = 'data:image/webp;base64,UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==';
+        
+        // Aplicar classes ao body para CSS condicional
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.appCapabilities.webgl) document.body.classList.add('webgl-support');
+            if (window.appCapabilities.webpSupport) document.body.classList.add('webp-support');
+            if (window.appCapabilities.serviceWorker) document.body.classList.add('sw-support');
+        });
+    </script>
+
+    <!-- TensorFlow.js para detecção de capacidades iniciais -->
+    <script>
+        // Função para carregar TensorFlow.js de forma elegante
+        function loadTensorFlowOptimized() {
+            // Apenas tentar carregar se WebGL estiver disponível
+            if (!window.appCapabilities.webgl) {
+                console.log('WebGL não disponível, pulando carregamento do TensorFlow');
+                return;
+            }
+            
+            // Tentar carregar TensorFlow.js
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.15.0/dist/tf.min.js';
+            script.async = true;
+            
+            // Eventos para detectar sucesso/falha
+            script.onload = function() {
+                window.appCapabilities.tensorflow = true;
+                document.body.classList.add('tf-support');
+                console.log('TensorFlow.js carregado com sucesso');
+            };
+            
+            script.onerror = function() {
+                window.appCapabilities.tensorflow = false;
+                console.warn('Falha ao carregar TensorFlow.js');
+            };
+            
+            document.head.appendChild(script);
+        }
+        
+        // Tentar carregar após um pequeno delay
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(loadTensorFlowOptimized, 2000); // Carregar após 2 segundos
+            });
+        } else {
+            setTimeout(loadTensorFlowOptimized, 2000);
+        }
+    </script>
 </head>
 
   <body>
@@ -174,70 +332,46 @@ href="https://unpkg.com/swiper/swiper-bundle.min.css"
   </button>
 </div>
        
-<div id="loading-overlay">
-  <div class="loading-spinner"></div>
-  <p class="loading-text">Carregando Morro Digital...</p>
+
+<div id="instruction-banner" class="instruction-banner hidden">
+  <div class="instruction-primary">
+    <span id="instruction-arrow">⬆️</span>
+    <h2 id="instruction-main">Siga em frente</h2>
+    <button id="minimize-navigation-btn" aria-label="Minimizar instruções de navegação" aria-expanded="true"></button>
+  </div>
+  <div class="instruction-secondary">
+    <p id="instruction-details">200m - Rua Caminho do Farol</p>
+    <div class="instruction-extra">
+      <p id="instruction-distance">📏: 200m</p>
+      <p id="instruction-time">⏱️: 2 minutos</p>
+    </div>
+    <!-- Adicionar o elemento de progresso que está faltando -->
+    <div id="route-progress-container">
+      <progress id="route-progress" value="0" max="100"></progress>
+      <span id="progress-text">0%</span>
+    </div>
+  </div>
 </div>
 
-<script>
-  // Expose function to hide overlay
-  window.hideLoadingOverlay = function() {
-    const overlay = document.getElementById("loading-overlay");
-    if (overlay) {
-      overlay.classList.add("fade-out");
-      
-      // After animation completes, hide completely
-      setTimeout(() => {
-        overlay.style.display = 'none';
-      }, 600); // slightly longer than the CSS transition
-    }
-  };
-</script>
-
-<!-- Após os scripts do Leaflet -->
-<script>
-  // Token do Mapbox (mantenha seguro em produção)
-  window.mapboxToken = 'pk.eyJ1IjoibW9ycm9kaWdpdGFsIiwiYSI6ImNscWEzaHVnNzAwbjIyanBmeGE1bXY0aTYifQ.3f3nf3e8QnHRH7whYn5ljg';
-
-  // Garantir que o mapboxgl esteja disponível globalmente
-  window.initMapboxGL = function() {
-    if (!window.mapboxgl) {
-      console.log('[initMapboxGL] Carregando Mapbox GL JS...');
-      const script = document.createElement('script');
-      script.src = 'https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js';
-      script.onload = function() {
-        console.log('[initMapboxGL] Mapbox GL JS carregado com sucesso');
-        // Configurar o token de acesso
-        mapboxgl.accessToken = window.mapboxToken;
-        // Disparar evento para notificar que o Mapbox GL está pronto
-        document.dispatchEvent(new CustomEvent('mapboxgl:loaded'));
-      };
-      script.onerror = function() {
-        console.error('[initMapboxGL] Erro ao carregar Mapbox GL JS');
-      };
-      document.head.appendChild(script);
-      
-      // Adicionar o CSS
-      const link = document.createElement('link');
-      link.href = 'https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css';
-      link.rel = 'stylesheet';
-      document.head.appendChild(link);
-    } else {
-      console.log('[initMapboxGL] Mapbox GL JS já está carregado');
-      mapboxgl.accessToken = window.mapboxToken;
-      document.dispatchEvent(new CustomEvent('mapboxgl:loaded'));
-    }
-  };
-  
-  // Inicializar o Mapbox GL quando a página carregar
-  document.addEventListener('DOMContentLoaded', function() {
-    window.initMapboxGL();
-  });
-</script>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+      <div class="loading-content">
+        <div class="spinner"></div>
+        <p>Carregando Morro Digital...</p>
+      </div>
+    </div>
 
     <!-- Scripts principais -->
     <script type="module" src="./main.js"></script>
+    <script>
+      // Remove loading overlay when content loads
+      window.addEventListener("load", function () {
+        setTimeout(function () {
+          document.getElementById("loading-overlay").classList.add("fade-out");
+        }, 800);
+      });
 
+    </script>
   </body>
 </html>
 

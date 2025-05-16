@@ -335,7 +335,7 @@ function addControlStyles() {
     @media (max-width: 768px) {
       .unified-map-controls {
         top: auto;
-        bottom: 100px;
+        bottom: 50%;
         right: 10px;
       }
       

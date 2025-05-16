@@ -604,7 +604,7 @@ async function translateOnline(text, targetLang) {
     return localTranslation || text;
   }
 }
-export async function formatDistance(distance, language) {
+async function formatDistance(distance, language) {
   // Normalizar idioma
   if (typeof language === "object") {
     language = language.code || language.language || "pt";

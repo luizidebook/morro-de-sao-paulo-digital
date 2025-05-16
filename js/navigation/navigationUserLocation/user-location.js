@@ -21,7 +21,6 @@ import { apiKey } from "../../map/mapManager.js";
 import { map } from "../../map/map-controls.js";
 import { navigationState } from "../navigationState/navigationStateManager.js";
 import { calculateDistance } from "../navigationUtils/distanceCalculator.js";
-
 import {
   recalculationInProgress,
   isRecalculationInProgress, // Opcionalmente, pode importar a função também
@@ -40,89 +39,7 @@ export let watchId = null;
 export let userMarker;
 export let positionWatcherId = null; // ID do watchPosition para monitoramento contínuo
 export let userAccuracyCircle;
-// Adicionar ao início de enhanced-location-manager.js
 
-// Importações da versão antiga para compatibilidade
-import {
-  updateUserMarker as legacyUpdateMarker,
-  createUserMarker as legacyCreateMarker,
-} from "./user-location.js";
-
-// Variável para controlar migração
-let usingLegacyMarkerSystem = true;
-
-// Função para alternar entre sistemas
-export function switchToEnhancedMarkerSystem(force = false) {
-  if (!usingLegacyMarkerSystem && !force) return;
-
-  usingLegacyMarkerSystem = false;
-  console.log("[LocationSystem] Migrando para sistema de marcador avançado");
-
-  // Migrar estado atual para o novo sistema
-  if (window.userLocation) {
-    createUserMarker(
-      window.userLocation.latitude,
-      window.userLocation.longitude,
-      window.userLocation.heading || 0,
-      window.userLocation.accuracy || 15
-    );
-  }
-}
-
-// Adicionar ao navigationController.js ou a um arquivo separado
-
-/**
- * Exibe diagnóstico completo do sistema de navegação integrado
- */
-export function runCompleteSystemDiagnostic() {
-  console.group("🔍 Diagnóstico Completo do Sistema de Navegação");
-
-  // 1. Estado do sistema de localização
-  const locationState = getLocationSystemState();
-  console.log("📍 Sistema de Localização:", {
-    qualidade: locationState.signalQuality,
-    estratégia: locationState.currentStrategy,
-    precisão: locationState.currentLocation?.accuracy || "N/A",
-    emMovimento: locationState.isMoving,
-    velocidade: (locationState.currentSpeed * 3.6).toFixed(1) + " km/h",
-  });
-
-  // 2. Estado de navegação
-  console.log("🧭 Estado de Navegação:", {
-    ativo: navigationState.isActive,
-    passoAtual: navigationState.currentStepIndex,
-    totalPassos: navigationState.instructions?.length || 0,
-    progresso: navigationState.routeProgress + "%",
-    distânciaRestante: navigationState.distanceToDestination + "m",
-  });
-
-  // 3. Verificar plugins e recursos
-  const pluginsStatus = {
-    rotaçãoMapa: typeof L.Map.prototype.setBearing === "function",
-    rotaçãoMarcador: typeof L.Marker.prototype.setRotationAngle === "function",
-    systemIcons:
-      document.querySelectorAll('link[href*="user-marker.svg"]').length > 0,
-  };
-  console.log("🔌 Plugins e Recursos:", pluginsStatus);
-
-  // 4. Diagnósticos específicos
-  console.log("🔬 Verificações específicas:");
-  console.log("- User Marker presente:", !!window.userMarker);
-  console.log("- Route Data carregado:", !!window.lastRouteData);
-  console.log("- Position Watch ativo:", !!window.positionWatcherId);
-
-  console.groupEnd();
-
-  return {
-    locationSystem: locationState,
-    navigation: {
-      active: navigationState.isActive,
-      currentStep: navigationState.currentStepIndex,
-      progress: navigationState.routeProgress,
-    },
-    plugins: pluginsStatus,
-  };
-}
 // Verificar se os estilos CSS estão presentes e injetá-los se necessário
 function ensureNavigationStyles() {
   if (!document.getElementById("navigation-marker-styles")) {
@@ -1050,7 +967,7 @@ export function createUserMarker(
   mapInstance = null
 ) {
   try {
-    // Log detalhado para debug
+    // Registro detalhado para debug
     console.log("[createUserMarker] Iniciando criação com parâmetros:", {
       lat,
       lon,
@@ -1058,7 +975,7 @@ export function createUserMarker(
       accuracy,
     });
 
-    // Verificar que temos uma instância do mapa
+    // Garantir que temos uma instância do mapa
     const map =
       mapInstance ||
       window.map ||
@@ -1091,7 +1008,7 @@ export function createUserMarker(
       window.userAccuracyCircle.remove();
     }
 
-    // Criar ícone do marcador com a seta utilizando SVG
+    // Criar o ícone do marcador com a seta utilizando SVG
     const icon = L.divIcon({
       html: `
     <div class="user-location-arrow">
@@ -1100,9 +1017,7 @@ export function createUserMarker(
         <path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z" 
               fill="#ff0000" 
               stroke="#ffffff" 
-              stroke-width="1"
-              stroke-linejoin="round" />
-        <circle cx="12" cy="12" r="2" fill="#ffffff" fill-opacity="0.7"/>
+              stroke-width="1" />
       </svg>
     </div>
   `,

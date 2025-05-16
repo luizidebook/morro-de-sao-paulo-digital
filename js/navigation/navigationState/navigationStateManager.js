@@ -96,14 +96,8 @@ const NavigationStatus = {
 export const navigationState = {
   // Estado principal da navegação
   status: NavigationStatus.IDLE,
-  // Novas propriedades para modo 3D
-  is3DModeEnabled: false,
-  previousMapState: null,
-  lastUserHeading: 0,
 
-  // Para rastreamento de câmera
-  followUser: true,
-  autoRotateMap: true, // Estado de erro
+  // Estado de erro
   error: null,
 
   // Flag para controle da navegação

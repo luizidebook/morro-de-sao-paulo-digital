@@ -56,7 +56,7 @@ export function createNavigationBanner() {
     <div class="instruction-secondary">
       <p id="${UI_CONFIG.IDS.INSTRUCTION_DETAILS}" class="instruction-details">Siga em frente por 100m</p>
       <div class="progress-container">
-        <div id="progress" class="progress-bar" style="width: 0%"></div>
+        <div id="route-progress" class="progress-indicator-fill" style="width: 0%"></div>
       </div>
       <div id="progress-text" style="text-align: center; font-size: 0.8em; margin: 4px 0;">0%</div>
       <div class="metrics-group">
@@ -220,90 +220,6 @@ export function showNavigationLoading(message = "Calculando rota...") {
 }
 
 /**
- * Oculta o indicador de carregamento e restaura o banner para o estado normal
- * @param {boolean} [animate=true] - Indica se a transição deve ser animada
- * @param {boolean} [restorePreviousState=false] - Se deve tentar restaurar o estado anterior do banner
- */
-export function hideNavigationLoading(
-  animate = true,
-  restorePreviousState = false
-) {
-  console.log("[hideNavigationLoading] Ocultando indicador de carregamento");
-
-  // Obter referência ao banner
-  const banner = document.getElementById(UI_CONFIG.IDS.BANNER);
-
-  // Se não houver banner, não há nada a fazer
-  if (!banner) {
-    console.warn("[hideNavigationLoading] Banner não encontrado, nada a fazer");
-    return;
-  }
-
-  // Obter referências aos elementos
-  const arrowEl = banner.querySelector(`#${UI_CONFIG.IDS.INSTRUCTION_ARROW}`);
-  const mainTextEl = banner.querySelector(`#${UI_CONFIG.IDS.INSTRUCTION_MAIN}`);
-  const detailsEl = banner.querySelector(
-    `#${UI_CONFIG.IDS.INSTRUCTION_DETAILS}`
-  );
-
-  // Remover classes de animação de carregamento
-  banner.classList.remove(
-    UI_CONFIG.CLASSES.INITIALIZING,
-    UI_CONFIG.CLASSES.ENTRY_ANIMATION
-  );
-
-  // Remover animação de rotação do ícone
-  if (arrowEl) {
-    arrowEl.classList.remove(UI_CONFIG.CLASSES.ROTATING);
-  }
-
-  // Restaurar banner ao estado "preparado" para interações
-  banner.classList.add(UI_CONFIG.CLASSES.PREPARED);
-
-  // Se não devemos animar, aplicar classes imediatamente
-  if (!animate) {
-    // Se o banner estava anteriormente minimizado e devemos restaurar esse estado
-    if (restorePreviousState && banner.dataset.wasMinimized === "true") {
-      banner.classList.add(UI_CONFIG.CLASSES.MINIMIZED);
-    }
-
-    // Log de conclusão
-    console.log(
-      "[hideNavigationLoading] Indicador de carregamento ocultado sem animação"
-    );
-    return;
-  }
-
-  // Com animação, aplicamos uma transição suave
-  banner.classList.add("transition-out");
-
-  setTimeout(() => {
-    banner.classList.remove("transition-out");
-
-    // Se o banner estava minimizado e devemos restaurar esse estado
-    if (restorePreviousState && banner.dataset.wasMinimized === "true") {
-      banner.classList.add(UI_CONFIG.CLASSES.MINIMIZED);
-
-      // Restaurar estado do botão de minimização
-      const minimizeBtn = banner.querySelector(
-        `#${UI_CONFIG.IDS.MINIMIZE_BUTTON}`
-      );
-      if (minimizeBtn) {
-        minimizeBtn.setAttribute("aria-expanded", "false");
-      }
-    }
-
-    // Log de conclusão
-    console.log(
-      "[hideNavigationLoading] Indicador de carregamento ocultado com animação"
-    );
-  }, 300); // Duração da animação de transição
-
-  // Limpar o dataset após uso
-  delete banner.dataset.wasMinimized;
-}
-
-/**
  * Simplifica uma instrução de navegação para um formato básico
  * @param {string} instruction - Instrução completa original
  * @param {number|string} type - Tipo de manobra
@@ -433,7 +349,7 @@ export function updateInstructionBanner(instruction, lang = selectedLanguage) {
       UI_CONFIG.IDS.INSTRUCTION_DISTANCE
     );
     const timeEl = document.getElementById(UI_CONFIG.IDS.INSTRUCTION_TIME);
-    const progressEl = banner.querySelector(".progress-bar");
+    const progressEl = banner.querySelector(".progress-indicator-fill");
 
     // 6. Verificar se todos os elementos críticos existem
     if (!iconEl || !mainTextEl || !detailsEl || !distanceEl || !timeEl) {
@@ -728,7 +644,7 @@ export function flashBanner(flash = true) {
  * @param {string} lang - Código do idioma
  * @returns {string} Distância formatada
  */
-function formatDistance(distance, lang) {
+export function formatDistance(distance, lang) {
   if (typeof distance !== "number") {
     const parsed = parseFloat(distance);
     if (isNaN(parsed)) return "0 m";
@@ -946,7 +862,7 @@ export function ensureBannerIntegrity() {
       id: UI_CONFIG.IDS.INSTRUCTION_TIME,
       selector: `#${UI_CONFIG.IDS.INSTRUCTION_TIME}`,
     },
-    { id: "progress", selector: ".progress-bar" },
+    { id: "progress", selector: ".progress-indicator-fill" },
   ];
 
   let needsRebuild = false;
@@ -1102,7 +1018,7 @@ function addBannerStyles() {
       margin: 12px 0;
     }
     
-    .progress-bar {
+    .progress-indicator-fill {
       height: 100%;
       background-color: #2563EB;
       border-radius: 2px;
@@ -1110,7 +1026,7 @@ function addBannerStyles() {
       transition: width 0.3s ease;
     }
     
-    .progress-bar.almost-complete {
+    .progress-indicator-fill.almost-complete {
       background-color: #10B981;
     }
     

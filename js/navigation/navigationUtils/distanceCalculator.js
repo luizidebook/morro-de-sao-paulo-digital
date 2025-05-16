@@ -315,43 +315,9 @@ export function findClosestPointOnRoute(routePoints, refLat, refLon) {
   };
 }
 
-// No final do arquivo, atualizar o export default:
-
 export default {
   calculateDistance,
-  isValidCoordinate,
+
   bearingToCardinal,
   findClosestPointOnRoute,
-  isWithinRadius, // Adicionar a nova função
 };
-
-/**
- * Verifica se um ponto está dentro de um raio específico de outro ponto
- * @param {Object} point - Ponto para verificar {lat, lon} ou {latitude, longitude}
- * @param {Object} center - Ponto central {lat, lon} ou {latitude, longitude}
- * @param {number} radius - Raio em metros
- * @returns {boolean} - true se estiver dentro do raio, false caso contrário
- */
-export function isWithinRadius(point, center, radius) {
-  if (!point || !center || !radius) return false;
-
-  // Normalizar coordenadas
-  const pointLat = point.lat || point.latitude;
-  const pointLon = point.lon || point.lng || point.longitude;
-  const centerLat = center.lat || center.latitude;
-  const centerLon = center.lon || center.lng || center.longitude;
-
-  // Verificar se coordenadas são válidas
-  if (
-    !isValidCoordinate(pointLat, pointLon) ||
-    !isValidCoordinate(centerLat, centerLon)
-  ) {
-    return false;
-  }
-
-  // Calcular distância
-  const distance = calculateDistance(pointLat, pointLon, centerLat, centerLon);
-
-  // Verificar se está dentro do raio
-  return distance <= radius;
-}
